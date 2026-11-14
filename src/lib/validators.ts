@@ -7,4 +7,11 @@ export const reportSchema = z.object({
  severity: z.coerce.number().int().min(1).max(5), safetyRisk: z.coerce.number().int().min(1).max(5), affectedPeople: z.coerce.number().int().min(1).max(5), durationDays: z.coerce.number().int().min(0).max(3650),
  images: z.array(z.object({ publicId: z.string().min(1).max(255) })).min(1).max(5)
 });
-export const transitionSchema = z.object({ status: z.enum(["VERIFIED", "REJECTED", "ASSIGNED", "IN_PROGRESS", "RESOLVED"]), note: z.string().trim().max(500).optional(), assignedToId: z.string().optional(), images: z.array(z.object({publicId:z.string()})).max(5).optional() });
+// `nullish()` menerima null dari klien lama dan mengubahnya menjadi undefined.
+// Klien baru tidak lagi mengirim assignedToId kecuali saat ASSIGNED.
+export const transitionSchema = z.object({
+ status: z.enum(["VERIFIED", "REJECTED", "ASSIGNED", "IN_PROGRESS", "RESOLVED"]),
+ note: z.string().trim().max(500).nullish().transform(value => value || undefined),
+ assignedToId: z.string().trim().nullish().transform(value => value || undefined),
+ images: z.array(z.object({publicId:z.string().min(1).max(255)})).max(5).optional(),
+});
