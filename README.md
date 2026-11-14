@@ -1,3 +1,5 @@
+> **Untuk hosting Vercel:** baca [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md) terlebih dahulu. Perbaikan terbaru menangani error TypeScript `photos: any[]`, menjalankan Prisma Client generation saat build, serta membatasi unggahan Cloudinary ke 4MB agar sesuai batas Vercel.
+
 # CivicSense — aplikasi laporan lingkungan
 
 Versi pengembangan lanjutan dari proyek `PROGRAM.zip` (Next.js 15, Prisma 6, Neon PostgreSQL, Cloudinary).

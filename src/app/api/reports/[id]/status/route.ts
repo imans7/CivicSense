@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { originAllowed } from "@/lib/community-api";
 import { currentUser } from "@/lib/session";

@@ -33,8 +33,8 @@ export async function POST(req: Request) {
 
   // Tolak lebih awal sebelum body dibaca
   const contentLength = Number(req.headers.get("content-length") ?? 0);
-  if (contentLength > IMAGE_RULES.maxSizeBytes + 512 * 1024) {
-    return errorResponse("Ukuran foto maksimal 5MB", 413);
+  if (contentLength > IMAGE_RULES.maxSizeBytes + 64 * 1024) {
+    return errorResponse("Ukuran foto maksimal 4MB", 413);
   }
 
   let form: FormData;

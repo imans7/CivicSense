@@ -50,7 +50,7 @@ export function ImageUploader({
         }
         const file = await compressImage(original);
         if (file.size > IMAGE_RULES.maxSizeBytes) {
-          throw new Error("Ukuran foto melebihi 5MB");
+          throw new Error("Ukuran foto melebihi 4MB");
         }
 
         const body = new FormData();
@@ -143,7 +143,7 @@ export function ImageUploader({
         Tambah foto
       </Button>
       <p className="text-xs text-muted-foreground">
-        JPG, PNG, atau WebP, maksimal 5MB per foto ({value.length}/{maxFiles}). Foto dikecilkan otomatis dan data lokasi kamera dibuang.
+        JPG, PNG, atau WebP, maksimal 4MB per foto ({value.length}/{maxFiles}). Foto dikecilkan otomatis dan data lokasi kamera dibuang.
       </p>
     </div>
   );

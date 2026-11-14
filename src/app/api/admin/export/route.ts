@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { currentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 function csvCell(value: unknown) {

@@ -25,7 +25,7 @@ export const PRIORITY_LABELS = {
 } as const;
 
 export const IMAGE_RULES = {
-  maxSizeBytes: 5 * 1024 * 1024, // 5MB
+  maxSizeBytes: 4 * 1024 * 1024, // 4 MiB: aman di bawah batas body Vercel 4.5 MB
   allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
 } as const;
 

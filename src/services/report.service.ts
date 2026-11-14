@@ -6,6 +6,16 @@ import { reportSchema,transitionSchema } from "@/lib/validators";
 import type { Role, ReportStatus } from "@prisma/client";
 import { z } from "zod";
 
+// Tentukan bentuk data foto secara eksplisit. Tanpa tipe ini TypeScript
+// strict pada build produksi Vercel menganggap photos sebagai any[].
+type CloudinaryPhoto = {
+ publicId: string;
+ imageUrl: string;
+ mimeType: string;
+ sizeBytes: number;
+ imageType: "REPORT" | "RESOLUTION";
+};
+
 export class ReportError extends Error { constructor(message:string,public status=400){super(message);} }
 const allowed = (old:ReportStatus, next:ReportStatus, role:Role) => {
  if(role==="ADMIN") return ({PENDING:["VERIFIED","REJECTED"],VERIFIED:["ASSIGNED","REJECTED"],ASSIGNED:["IN_PROGRESS"],IN_PROGRESS:["RESOLVED"],REJECTED:[],RESOLVED:[]} as Record<ReportStatus,string[]>)[old].includes(next);
@@ -16,7 +26,7 @@ export async function createReport(userId:string,input:z.infer<typeof reportSche
  const category=await prisma.category.findFirst({where:{id:input.categoryId,isActive:true}});
  if(!category) throw new ReportError("Kategori tidak ditemukan");
  // Ambil metadata foto dari Cloudinary, jangan mempercayai URL/ukuran yang dikirim browser.
- const photos=[];
+ const photos: CloudinaryPhoto[] = [];
  for(const photo of input.images){
   if(!photo.publicId.startsWith(`civicsense/report/${userId}/`)||photo.publicId.includes("..")) throw new ReportError("Foto bukan milik akun ini",403);
   if(await prisma.reportImage.findFirst({where:{publicId:photo.publicId}})) throw new ReportError("Foto telah digunakan",409);
@@ -46,7 +56,7 @@ export async function changeStatus(reportId:string,actor:{id:string;role:Role},i
   if(!officer)throw new ReportError("Petugas tidak valid");
  }
  if(["REJECTED","RESOLVED"].includes(input.status)&&!input.note?.trim())throw new ReportError("Catatan wajib untuk penolakan dan penyelesaian");
- const photos=[];
+ const photos: CloudinaryPhoto[] = [];
  if(input.images?.length){
   if(input.status!=="RESOLVED")throw new ReportError("Foto penanganan hanya dapat diunggah saat penyelesaian");
   for(const img of input.images){

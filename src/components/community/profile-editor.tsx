@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, CircleX, LoaderCircle, Save } from "lucide-react";
 import { compressImage } from "@/lib/image-compress";
+import { IMAGE_RULES } from "@/lib/constants";
 import { UserAvatar } from "@/components/community/user-avatar";
 
 export function ProfileEditor({ user }: { user: { id: string; name: string; bio: string | null; location: string | null; avatarUrl: string | null; avatarPublicId: string | null } }) {
@@ -21,10 +22,11 @@ export function ProfileEditor({ user }: { user: { id: string; name: string; bio:
     try {
       if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Gunakan JPG, PNG, atau WebP");
       const compressed = await compressImage(file);
+      if (compressed.size > IMAGE_RULES.maxSizeBytes) throw new Error("Foto profil maksimal 4MB setelah kompresi");
       const data = new FormData(); data.append("file", compressed); data.append("type", "AVATAR");
       const response = await fetch("/api/upload", { method: "POST", body: data });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Gagal mengunggah foto");
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || "Gagal mengunggah foto (pastikan ukuran di bawah 4MB)");
       // Jika foto baru yang belum disimpan diganti lagi, bersihkan foto sementara lama.
       if (avatar.publicId && avatar.publicId !== user.avatarPublicId) {
         await fetch("/api/upload", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publicId: avatar.publicId }) }).catch(() => null);

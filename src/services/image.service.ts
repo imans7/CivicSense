@@ -51,7 +51,7 @@ export async function uploadImage(params: {
 
   if (file.size === 0) throw new ImageError("File kosong");
   if (file.size > IMAGE_RULES.maxSizeBytes) {
-    throw new ImageError("Ukuran foto maksimal 5MB", 413);
+    throw new ImageError("Ukuran foto maksimal 4MB", 413);
   }
 
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
