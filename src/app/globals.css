@@ -211,3 +211,95 @@ body{background:#fff;color:var(--community-ink)}
 
 @media(min-width:651px) and (max-width:1180px){.inbox-nav-item .inbox-count-badge{display:inline-flex!important;align-items:center;justify-content:center}}
 .inbox-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:#ed334e;color:#fff;font-size:9px;font-weight:900}
+
+
+/* Mobile bottom navigation: equal-width items with labels under every icon. */
+@media(max-width:650px){
+  .community-app{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .mobile-community-nav{
+    display:flex;
+    align-items:stretch;
+    justify-content:stretch;
+    gap:0;
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    width:100%;
+    height:68px;
+    padding:5px 4px calc(5px + env(safe-area-inset-bottom));
+    box-sizing:border-box;
+    background:#fff;
+    border-top:1px solid var(--community-line);
+    z-index:100;
+    box-shadow:0 -4px 16px #182d4810;
+  }
+  .mobile-community-nav>.mobile-community-nav-item{
+    flex:1 1 0;
+    width:0;
+    min-width:0;
+    height:100%;
+    padding:3px 1px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    color:#60748d;
+    text-decoration:none;
+    border-radius:10px;
+    white-space:nowrap;
+  }
+  .mobile-community-nav>.mobile-community-nav-item:active{
+    color:var(--community-blue);
+    background:#f2f7ff;
+  }
+  .mobile-community-nav-icon,
+  .mobile-community-nav>.mobile-inbox-link .inbox-nav-icon svg{
+    display:block;
+    width:22px;
+    height:22px;
+    flex:0 0 22px;
+    stroke-width:1.9;
+  }
+  .mobile-community-nav-label{
+    display:block;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    font-size:9px;
+    line-height:1.15;
+    font-weight:700;
+    letter-spacing:-.1px;
+    text-align:center;
+  }
+  .mobile-community-nav>.mobile-inbox-link{
+    flex:1 1 0;
+    width:0;
+    min-width:0;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    padding:3px 1px;
+    color:#60748d;
+  }
+  .mobile-community-nav .inbox-nav-icon{
+    width:22px;
+    height:22px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 22px;
+  }
+  .mobile-community-nav .inbox-count-badge{
+    right:-8px;
+    top:-6px;
+    min-width:16px;
+    height:16px;
+    font-size:8px;
+    line-height:12px;
+  }
+}

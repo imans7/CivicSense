@@ -55,12 +55,30 @@ export async function ForumShell({ children }: { children: React.ReactNode }) {
       <footer className="right-footer">CivicSense · Komunitas peduli lingkungan<br/>Bersama, kita buat perubahan.</footer>
     </aside>
     <nav className="mobile-community-nav" aria-label="Navigasi seluler">
-      <Link href="/" aria-label="Beranda"><Home/></Link>
-      <Link href="/reports" aria-label="Jelajahi"><Compass/></Link>
-      {staff && <Link href={deskLink} aria-label={user.role === "ADMIN" ? "Pusat kendali" : "Tugas saya"}><LayoutDashboard/></Link>}
-      <Link href={user ? "/reports/new" : "/login"} aria-label="Buat laporan"><PenLine/></Link>
-      {user ? <InboxNavLink initialCount={unreadInboxCount} mobile /> : <Link href="/login" aria-label="Kotak Masuk"><MessageSquare/></Link>}
-      <Link href={user ? `/users/${user.id}` : "/login"} aria-label="Profil"><UserRound/></Link>
+      <Link href="/" className="mobile-community-nav-item" aria-label="Beranda">
+        <Home className="mobile-community-nav-icon" aria-hidden="true"/>
+        <span className="mobile-community-nav-label">Beranda</span>
+      </Link>
+      <Link href="/reports" className="mobile-community-nav-item" aria-label="Jelajahi">
+        <Compass className="mobile-community-nav-icon" aria-hidden="true"/>
+        <span className="mobile-community-nav-label">Jelajahi</span>
+      </Link>
+      {staff && <Link href={deskLink} className="mobile-community-nav-item" aria-label={user.role === "ADMIN" ? "Pusat kendali" : "Tugas saya"}>
+        <LayoutDashboard className="mobile-community-nav-icon" aria-hidden="true"/>
+        <span className="mobile-community-nav-label">{user.role === "ADMIN" ? "Pusat kendali" : "Tugas saya"}</span>
+      </Link>}
+      <Link href={user ? "/reports/new" : "/login"} className="mobile-community-nav-item" aria-label="Buat laporan">
+        <PenLine className="mobile-community-nav-icon" aria-hidden="true"/>
+        <span className="mobile-community-nav-label">Buat Laporan</span>
+      </Link>
+      {user ? <InboxNavLink initialCount={unreadInboxCount} mobile /> : <Link href="/login" className="mobile-community-nav-item" aria-label="Kotak Masuk">
+        <MessageSquare className="mobile-community-nav-icon" aria-hidden="true"/>
+        <span className="mobile-community-nav-label">Kotak Masuk</span>
+      </Link>}
+      <Link href={user ? `/users/${user.id}` : "/login"} className="mobile-community-nav-item" aria-label="Profil">
+        <UserRound className="mobile-community-nav-icon" aria-hidden="true"/>
+        <span className="mobile-community-nav-label">Profil</span>
+      </Link>
     </nav>
   </div>;
 }
