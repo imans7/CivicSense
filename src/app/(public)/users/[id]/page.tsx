@@ -7,6 +7,7 @@ import { feedInclude, interactionSets } from "@/lib/community";
 import { Feed } from "@/components/community/feed";
 import { LogoutButton } from "@/components/logout-button";
 import { UserAvatar } from "@/components/community/user-avatar";
+import { StartConversationButton } from "@/components/community/start-conversation-button";
 import { getProfileStats, profileHandle, roleCaption } from "@/lib/profile";
 export const dynamic = "force-dynamic";
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
@@ -27,7 +28,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     <header className="feed-heading detail-header"><Link href="/" aria-label="Kembali"><ArrowLeft size={22}/></Link><div><h1>{profile.name}</h1><small>{stats.totalReports} laporan dikirim</small></div></header>
     <div className={`profile-banner banner-${profile.role.toLowerCase()}`}><span className="banner-pattern"/></div>
     <div className="profile-top"><UserAvatar user={profile} size="xl" link={false}/>
-      {self ? <div className="profile-own-actions"><Link className="secondary-action profile-edit-link" href="/settings/profile"><Settings2 size={16}/> Edit profil</Link><LogoutButton/></div> : <span className="profile-visitor-badge"><ShieldCheck size={16}/> Profil komunitas</span>}
+      {self ? <div className="profile-own-actions"><Link className="secondary-action profile-edit-link" href="/settings/profile"><Settings2 size={16}/> Edit profil</Link><LogoutButton/></div> : viewer && profile.isActive ? <StartConversationButton userId={profile.id}/> : <span className="profile-visitor-badge"><ShieldCheck size={16}/> Profil komunitas</span>}
     </div>
     <div className="profile-info"><h2>{profile.name} {profile.role !== "PUBLIC" && <BadgeCheck size={21} className="verified-icon"/>}</h2>
       <p className="profile-handle">{profileHandle(profile)}</p>

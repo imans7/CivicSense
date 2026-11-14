@@ -5,6 +5,7 @@
 Versi pengembangan lanjutan dari proyek `PROGRAM.zip` (Next.js 15, Prisma 6, Neon PostgreSQL, Cloudinary).
 
 ## Fitur yang sudah diimplementasikan
+- Kotak Masuk untuk seluruh peran: notifikasi ketika orang lain mengomentari laporan milik pengguna, daftar pesan pribadi, percakapan satu lawan satu, indikator pesan belum dibaca, dan status dibaca.
 - Daftar, masuk, keluar; sesi acak disimpan sebagai hash di Neon dan cookie HttpOnly.
 - Peran PUBLIC / OFFICER / ADMIN dengan pembatasan endpoint dan halaman.
 - Laporan baru (kategori, foto Cloudinary, GPS, alamat, indikator skor prioritas otomatis).
@@ -108,3 +109,17 @@ Seluruh rute dashboard kini memakai kerangka forum yang sama dengan beranda komu
 ### Batas pengujian saat paket ini dibuat
 
 Pemeriksaan **sintaks** TypeScript/TSX telah dijalankan; instalasi dependensi tidak berhasil diselesaikan dalam lingkungan pembuatan ini, sehingga `tsc --noEmit`, build Next.js, migrasi Neon yang nyata, dan Cloudinary yang nyata belum tervalidasi. Uji di atas wajib sebelum deployment. Rate limiter masih in-memory dan perlu Redis/WAF di produksi. Perlu audit ulang untuk proteksi race condition penugasan, kebijakan konten dan privasi publik, serta pembatasan penyalahgunaan pada API.
+
+
+## Kotak Masuk & pesan pribadi (14 November 2026)
+
+- `/inbox` menyediakan tab **Aktivitas** (notifikasi komentar pada laporan milik pengguna) dan **Pesan** (daftar percakapan privat).
+- `/inbox/[conversationId]` adalah ruang chat satu lawan satu. Pengguna dapat memulai percakapan melalui tombol **Kirim pesan** di profil publik orang lain.
+- Lencana merah di navigasi desktop dan bawah ponsel menampilkan total notifikasi komentar dan pesan masuk yang belum dibaca. Hitungan diperbarui berkala.
+- Pesan hanya dapat dibaca oleh dua akun yang menjadi peserta percakapan. Admin dan petugas tidak mendapat akses khusus ke percakapan privat.
+- Pesan teks dibatasi 2.000 karakter; API menerapkan autentikasi, pemeriksaan keanggotaan, Origin check, dan rate limit best-effort.
+- Chat memperbarui pesan secara berkala (polling 4 detik) agar kompatibel dengan Vercel serverless; tidak memakai WebSocket yang memerlukan koneksi persisten.
+
+**Migrasi baru:** `prisma/migrations/20261114110000_inbox_messaging/migration.sql` membuat tabel `Notification`, `Conversation`, dan `Message`. Migrasi ini menambahkan tabel dan indeks, tidak menghapus laporan, komentar, like, atau data profil yang sudah ada.
+
+**Deployment:** backup/branch Neon terlebih dahulu, lalu jalankan `npm install`, `npx prisma generate`, `npx prisma migrate deploy`, `npm run typecheck`, dan `npm run build`. Jangan menjalankan `prisma migrate reset` di database produksi.

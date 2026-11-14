@@ -101,3 +101,31 @@ Vercel Function membatasi request body sekitar **4,5 MB**. Aplikasi ini masih me
 - Prisma menggunakan pooled `DATABASE_URL` untuk beban serverless. Sebaiknya pilih region Vercel yang dekat dengan region Neon agar latency rendah.
 - URL gambar Cloudinary yang dipublikasikan bisa diakses orang yang mengetahui URL-nya; jangan unggah informasi pribadi/sensitif.
 - Paket ini telah melalui pemeriksaan sintaks dan path impor lokal, **belum melalui build penuh** di lingkungan pembuatan karena registry npm tidak dapat diakses. Wajib menjalankan cek pada bagian E sebelum produksi.
+
+
+## I. Kotak Masuk, notifikasi komentar, dan pesan privat (14 November 2026)
+
+Versi ini menambahkan migrasi `20261114110000_inbox_messaging`. Migrasi membuat tabel `Notification`, `Conversation`, dan `Message` tanpa menghapus data CivicSense sebelumnya.
+
+**Sebelum deployment:**
+1. Buat backup atau branch Neon.
+2. Di root proyek, dengan `.env` berisi `DATABASE_URL` pooled dan `DIRECT_URL` direct:
+   ```bash
+   npm install
+   npx prisma generate
+   npx prisma migrate deploy
+   npm run typecheck
+   npm run build
+   ```
+3. Commit dan push source ke GitHub, lalu deploy ulang Vercel. Tidak ada environment variable baru yang diperlukan.
+
+**Skenario uji setelah deployment:**
+1. Login sebagai Warga A, buat satu laporan.
+2. Login sebagai Warga B (browser/incognito berbeda), buka laporan Warga A, kirim komentar.
+3. Kembali ke Warga A. Lencana merah Kotak Masuk harus bertambah; buka `/inbox` > **Aktivitas**, lalu klik notifikasi untuk kembali ke diskusi laporan.
+4. Dari profil Warga B, klik **Kirim pesan**. Kirim pesan dari Warga A dan pastikan hanya Warga A/B dapat membuka URL percakapan.
+5. Login sebagai petugas dan admin. Pastikan kedua peran juga memiliki Kotak Masuk, dapat memulai percakapan, dan hanya melihat percakapan yang mereka ikuti.
+6. Buka chat di akun penerima. Pesan harus berubah menjadi status dibaca dan angka lencana berkurang.
+7. Uji akses URL percakapan dengan akun ketiga; server harus mengembalikan 404.
+
+Chat memakai polling 4 detik (bukan WebSocket), sehingga pembaruan mendekati real-time dan sesuai model fungsi Vercel. Rate limit saat ini best-effort per instance; untuk pemakaian publik skala besar, ganti dengan Redis/Upstash dan tambahkan fitur blokir/laporkan pengguna serta moderasi pesan.
