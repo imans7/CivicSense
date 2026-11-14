@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // Neon: koneksi pooled (host berakhiran -pooler), dipakai aplikasi
+  directUrl = env("DIRECT_URL")   // Neon: koneksi langsung, dipakai migrasi Prisma
+}
+
+// ───────── Enum ─────────
+
+enum Role {
+  PUBLIC
+  OFFICER
+  ADMIN
+}
+
+enum ReportStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum ImageType {
+  REPORT
+  VERIFICATION
+  RESOLUTION
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ───────── Model ─────────
+
+model User {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(100)
+  email     String   @unique @db.VarChar(191)
+  password  String   @db.VarChar(255) // hash bcrypt
+  role      Role     @default(PUBLIC)
+  isActive  Boolean  @default(true)
+  bio       String?  @db.VarChar(280)
+  location  String?  @db.VarChar(120)
+  avatarUrl String?  @db.VarChar(500)
+  avatarPublicId String? @unique @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reportsCreated  Report[]        @relation("ReportReporter")
+  reportsAssigned Report[]        @relation("ReportOfficer")
+  histories       ReportHistory[]
+  sessions        Session[]
+  comments        Comment[]
+  likes           ReportLike[]
+  dislikes        ReportDislike[]
+  bookmarks       ReportBookmark[]
+
+  @@index([role, isActive])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reports Report[]
+}
+
+model Report {
+  id            String  @id @default(cuid())
+  reportNumber  String  @unique @db.VarChar(20)
+  userId        String
+  categoryId    String
+  assignedToId  String?
+  duplicateOfId String?
+
+  title       String  @db.VarChar(150)
+  description String  @db.Text
+  latitude    Decimal @db.Decimal(10, 8)
+  longitude   Decimal @db.Decimal(11, 8)
+  address     String? @db.VarChar(255)
+
+  // Indikator prioritas (skala 1-5), durasi dalam hari (dikonversi ke skala 1-5)
+  severity       Int
+  safetyRisk     Int
+  affectedPeople Int
+  durationDays   Int
+  priorityScore  Decimal       @db.Decimal(3, 2)
+  priorityLevel  PriorityLevel
+  status         ReportStatus  @default(PENDING)
+
+  verifiedAt DateTime?
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user        User     @relation("ReportReporter", fields: [userId], references: [id], onDelete: Restrict)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  assignedTo  User?    @relation("ReportOfficer", fields: [assignedToId], references: [id], onDelete: SetNull)
+  duplicateOf Report?  @relation("ReportDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  duplicates  Report[] @relation("ReportDuplicates")
+
+  images    ReportImage[]
+  histories ReportHistory[]
+  comments  Comment[]
+  likes     ReportLike[]
+  dislikes  ReportDislike[]
+  bookmarks ReportBookmark[]
+
+  @@index([status, priorityScore])
+  @@index([categoryId])
+  @@index([assignedToId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ReportImage {
+  id        String    @id @default(cuid())
+  reportId  String
+  imageUrl  String    @db.VarChar(500)
+  publicId  String    @unique @db.VarChar(255)
+  imageType ImageType @default(REPORT)
+  mimeType  String    @db.VarChar(50)
+  sizeBytes Int
+  createdAt DateTime  @default(now())
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model ReportHistory {
+  id        String        @id @default(cuid())
+  reportId  String
+  userId    String?
+  oldStatus ReportStatus?
+  newStatus ReportStatus
+  note      String?       @db.VarChar(500)
+  createdAt DateTime      @default(now())
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([reportId, createdAt])
+}
+
+// Penghitung nomor laporan per tahun (format CS-2026-000001), dipakai di dalam transaksi
+model ReportCounter {
+  year       Int @id
+  lastNumber Int @default(0)
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @db.VarChar(64)
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Interaksi komunitas pada laporan publik
+model Comment {
+  id String @id @default(cuid())
+  reportId String
+  userId String
+  content String @db.VarChar(1000)
+  createdAt DateTime @default(now())
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([reportId, createdAt])
+  @@index([userId])
+}
+
+model ReportLike {
+  reportId String
+  userId String
+  createdAt DateTime @default(now())
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([reportId, userId])
+  @@index([userId])
+}
+
+model ReportBookmark {
+  reportId String
+  userId String
+  createdAt DateTime @default(now())
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([reportId, userId])
+  @@index([userId])
+}
+
+// Reaksi negatif dipisah agar seluruh like lama tetap utuh saat migrasi.
+// API menjamin pengguna tidak menyukai dan tidak menyukai pada saat yang sama.
+model ReportDislike {
+  reportId String
+  userId String
+  createdAt DateTime @default(now())
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([reportId, userId])
+  @@index([userId])
+}
