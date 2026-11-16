@@ -29,16 +29,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const afterValue = new URL(req.url).searchParams.get("after");
   const afterDate = afterValue ? new Date(afterValue) : null;
   const validAfter = afterDate && !Number.isNaN(afterDate.getTime()) ? afterDate : null;
-  const messages = await prisma.message.findMany({
-    where: {
-      conversationId: id,
-      ...(validAfter ? { createdAt: { gte: validAfter } } : {}),
-    },
-    orderBy: { createdAt: "asc" },
-    take: validAfter ? 50 : 100,
-    include: { sender: { select: { id: true, name: true, avatarUrl: true } } },
-  });
-  return NextResponse.json({ messages }, { headers: { "Cache-Control": "no-store" } });
+  const [messages, readReceipts] = await Promise.all([
+    prisma.message.findMany({
+      where: {
+        conversationId: id,
+        ...(validAfter ? { createdAt: { gte: validAfter } } : {}),
+      },
+      orderBy: { createdAt: "asc" },
+      take: validAfter ? 50 : 100,
+      include: { sender: { select: { id: true, name: true, avatarUrl: true } } },
+    }),
+    // Status baca untuk pesan milik pengguna yang sedang membuka percakapan.
+    prisma.message.findMany({
+      where: { conversationId: id, senderId: user.id, readAt: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { id: true, readAt: true },
+    }),
+  ]);
+  return NextResponse.json({ messages, readReceipts }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {

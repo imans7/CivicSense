@@ -121,6 +121,7 @@ model Report {
   duplicates  Report[] @relation("ReportDuplicates")
 
   images    ReportImage[]
+  videos    ReportVideo[]
   histories ReportHistory[]
   comments  Comment[]
   likes     ReportLike[]
@@ -281,4 +282,21 @@ model Message {
   @@index([conversationId, createdAt])
   @@index([conversationId, readAt])
   @@index([senderId])
+}
+
+
+// Bukti video laporan yang diunggah langsung ke Cloudinary.
+model ReportVideo {
+  id              String   @id @default(cuid())
+  reportId        String
+  videoUrl        String   @db.VarChar(1000)
+  publicId        String   @unique @db.VarChar(255)
+  mimeType        String   @db.VarChar(50)
+  sizeBytes       Int
+  durationSeconds Float
+  createdAt       DateTime @default(now())
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
 }

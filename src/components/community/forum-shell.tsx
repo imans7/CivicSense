@@ -9,8 +9,15 @@ import { getUnreadInboxCount } from "@/lib/inbox";
 import { InboxNavLink } from "@/components/community/inbox-nav-link";
 
 export async function ForumShell({ children }: { children: React.ReactNode }) {
-  const user = await currentUser();
-  const categories = await prisma.category.findMany({ where: { isActive: true }, take: 5, orderBy: { name: "asc" }, select: { id: true, name: true } });
+  const [user, categories] = await Promise.all([
+    currentUser(),
+    prisma.category.findMany({
+      where: { isActive: true },
+      take: 5,
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
   const menu = [
     { href: "/", label: "Beranda", icon: Home },
     { href: "/reports", label: "Jelajahi", icon: Compass },

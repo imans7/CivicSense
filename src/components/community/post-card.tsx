@@ -11,7 +11,8 @@ type Post = {
   id: string; reportNumber: string; title: string; description: string; address: string | null;
   status: ReportStatus; priorityLevel: PriorityLevel; createdAt: Date | string;
   user: { id: string; name: string; role: Role; avatarUrl: string | null }; category: { name: string };
-  images: { imageUrl: string }[]; _count: { comments: number; likes: number; dislikes: number };
+  images: { imageUrl: string }[]; videos: { videoUrl: string; durationSeconds: number; mimeType: string }[];
+  _count: { comments: number; likes: number; dislikes: number };
 };
 export function PostCard({ post, loggedIn, initiallyLiked = false, initiallyDisliked = false, initiallySaved = false }: {
   post: Post; loggedIn: boolean; initiallyLiked?: boolean; initiallyDisliked?: boolean; initiallySaved?: boolean;
@@ -35,7 +36,6 @@ export function PostCard({ post, loggedIn, initiallyLiked = false, initiallyDisl
       if (kind === "like") { setLiked(data.active); if (data.active) setDisliked(false); setLikes(data.likes); setDislikes(data.dislikes); }
       else if (kind === "dislike") { setDisliked(data.active); if (data.active) setLiked(false); setLikes(data.likes); setDislikes(data.dislikes); }
       else setSaved(data.active);
-      router.refresh();
     } catch (e) { setNotice(e instanceof Error ? e.message : "Terjadi kesalahan"); }
     finally { setBusy(false); }
   }
@@ -61,6 +61,12 @@ export function PostCard({ post, loggedIn, initiallyLiked = false, initiallyDisl
       {post.images.length > 0 && <Link href={`/reports/${post.id}`} className={`post-photos count-${Math.min(post.images.length, 4)}`}>
         {post.images.map((im, i) => <img key={i} src={im.imageUrl} alt={`Foto laporan ${i + 1}`} loading="lazy" />)}
       </Link>}
+      {post.videos?.length > 0 && <div className="post-videos">
+        {post.videos.map((video) => <div className="post-video-frame" key={video.videoUrl}>
+          <video src={video.videoUrl} controls playsInline preload="none" aria-label={`Video bukti laporan ${post.reportNumber}`} />
+          <span className="post-video-duration">{Math.ceil(video.durationSeconds)} detik</span>
+        </div>)}
+      </div>}
       <div className="post-badges"><span className={`status-pill status-${post.status.toLowerCase()}`}><i/>{STATUS_LABELS[post.status]}</span><span className="priority-pill">Prioritas {PRIORITY_LABELS[post.priorityLevel]}</span></div>
       <div className="post-actions">
         <Link href={`/reports/${post.id}#diskusi`} title="Komentar" className="post-action"><MessageCircle size={19}/><span>{post._count.comments}</span></Link>

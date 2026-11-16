@@ -49,8 +49,15 @@ export function InboxView({
   const messageUnread = conversations.reduce((total, conversation) => total + conversation.unreadCount, 0);
 
   useEffect(() => {
-    const timer = window.setInterval(() => router.refresh(), 12000);
-    return () => window.clearInterval(timer);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    const timer = window.setInterval(refreshWhenVisible, 30000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [router]);
 
   useEffect(() => {

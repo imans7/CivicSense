@@ -25,10 +25,17 @@ export function InboxNavLink({
         // Badge tetap menampilkan hitungan terakhir jika jaringan terputus.
       }
     };
-    const timer = window.setInterval(refresh, 12000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 20000);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       alive = false;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 

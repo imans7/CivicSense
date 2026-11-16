@@ -123,3 +123,8 @@ Pemeriksaan **sintaks** TypeScript/TSX telah dijalankan; instalasi dependensi ti
 **Migrasi baru:** `prisma/migrations/20261114110000_inbox_messaging/migration.sql` membuat tabel `Notification`, `Conversation`, dan `Message`. Migrasi ini menambahkan tabel dan indeks, tidak menghapus laporan, komentar, like, atau data profil yang sudah ada.
 
 **Deployment:** backup/branch Neon terlebih dahulu, lalu jalankan `npm install`, `npx prisma generate`, `npx prisma migrate deploy`, `npm run typecheck`, dan `npm run build`. Jangan menjalankan `prisma migrate reset` di database produksi.
+
+
+## Pembaruan fitur terbaru
+
+Lihat `FITUR_VIDEO_DARK_MODE_CENTANG_BIRU_OPTIMASI.md` untuk panduan video laporan, dark mode, centang pesan dibaca, optimasi navigasi, dan migrasi Neon.

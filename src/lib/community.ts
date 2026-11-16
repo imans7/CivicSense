@@ -5,6 +5,7 @@ export const feedInclude = {
   user: { select: { id: true, name: true, role: true, avatarUrl: true } },
   category: { select: { name: true } },
   images: { where: { imageType: "REPORT" as const }, take: 4, select: { imageUrl: true } },
+  videos: { take: 1, select: { videoUrl: true, durationSeconds: true, mimeType: true } },
   _count: { select: { comments: true, likes: true, dislikes: true } },
 } as const;
 

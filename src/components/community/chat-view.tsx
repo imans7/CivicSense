@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Send, ShieldCheck } from "lucide-react";
 import { UserAvatar } from "@/components/community/user-avatar";
 
 type ChatUser = { id: string; name: string; role: "PUBLIC" | "OFFICER" | "ADMIN"; avatarUrl: string | null };
@@ -15,6 +14,7 @@ type ChatMessage = {
   senderId: string;
   sender: { id: string; name: string; avatarUrl: string | null };
 };
+type ReadReceipt = { id: string; readAt: string | null };
 
 export function ChatView({
   conversationId,
@@ -27,7 +27,6 @@ export function ChatView({
   otherUser: ChatUser;
   initialMessages: ChatMessage[];
 }) {
-  const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,29 +36,74 @@ export function ChatView({
 
   useEffect(() => {
     let active = true;
-    const markRead = () => fetch(`/api/inbox/conversations/${conversationId}/read`, { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+    const markRead = () => fetch(`/api/inbox/conversations/${conversationId}/read`, {
+      method: "POST",
+      credentials: "same-origin",
+    }).catch(() => undefined);
+
     const poll = async () => {
+      if (document.visibilityState !== "visible") return;
       try {
         const suffix = latest.current ? `?after=${encodeURIComponent(latest.current)}` : "";
-        const response = await fetch(`/api/inbox/conversations/${conversationId}/messages${suffix}`, { cache: "no-store" });
-        if (!response.ok) return;
-        const data = (await response.json()) as { messages: ChatMessage[] };
-        if (!active || !data.messages?.length) return;
-        setMessages((current) => {
-          const byId = new Map<string, ChatMessage>(current.map((message) => [message.id, message] as const));
-          for (const message of data.messages) byId.set(message.id, message);
-          return [...byId.values()].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        const response = await fetch(`/api/inbox/conversations/${conversationId}/messages${suffix}`, {
+          cache: "no-store",
+          credentials: "same-origin",
         });
-        const last = data.messages[data.messages.length - 1];
-        if (last) latest.current = last.createdAt;
-        await markRead();
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          messages?: ChatMessage[];
+          readReceipts?: ReadReceipt[];
+        };
+        if (!active) return;
+
+        const incoming = data.messages ?? [];
+        const receipts = data.readReceipts ?? [];
+        if (incoming.length || receipts.length) {
+          setMessages((current) => {
+            const byId = new Map<string, ChatMessage>(current.map((message) => [message.id, message] as const));
+            let changed = false;
+
+            for (const message of incoming) {
+              const previous = byId.get(message.id);
+              if (!previous || previous.readAt !== message.readAt) {
+                byId.set(message.id, message);
+                changed = true;
+              }
+            }
+            for (const receipt of receipts) {
+              const previous = byId.get(receipt.id);
+              if (previous && previous.readAt !== receipt.readAt) {
+                byId.set(receipt.id, { ...previous, readAt: receipt.readAt });
+                changed = true;
+              }
+            }
+            return changed
+              ? [...byId.values()].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+              : current;
+          });
+        }
+
+        const last = incoming[incoming.length - 1];
+        if (last) {
+          latest.current = last.createdAt;
+          await markRead();
+        }
       } catch {
-        // Polling berikutnya akan mencoba kembali jika koneksi sementara terputus.
+        // Polling berikutnya mencoba kembali jika koneksi sementara terputus.
       }
     };
+
     void markRead();
-    const timer = window.setInterval(poll, 4000);
-    return () => { active = false; window.clearInterval(timer); };
+    const timer = window.setInterval(poll, 6000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [conversationId]);
 
   useEffect(() => {
@@ -85,7 +129,6 @@ export function ChatView({
       setMessages((current) => current.some((item) => item.id === sentMessage.id) ? current : [...current, sentMessage]);
       latest.current = sentMessage.createdAt;
       setContent("");
-      router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Terjadi kesalahan saat mengirim pesan");
     } finally {
@@ -115,7 +158,12 @@ export function ChatView({
               {!mine && <UserAvatar user={message.sender} size="small" />}
               <div className={`chat-bubble ${mine ? "chat-bubble-mine" : "chat-bubble-theirs"}`}>
                 <p>{message.content}</p>
-                <small>{new Date(message.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })}{mine && message.readAt ? " · Dibaca" : ""}</small>
+                <small className="chat-message-meta">
+                  {new Date(message.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })}
+                  {mine && (message.readAt
+                    ? <CheckCheck className="chat-read-check" size={15} aria-label="Pesan sudah dibaca" title="Dibaca" />
+                    : <Check className="chat-sent-check" size={14} aria-label="Pesan terkirim" title="Terkirim" />)}
+                </small>
               </div>
             </div>
           );

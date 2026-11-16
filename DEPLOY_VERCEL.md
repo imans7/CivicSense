@@ -129,3 +129,19 @@ Versi ini menambahkan migrasi `20261114110000_inbox_messaging`. Migrasi membuat 
 7. Uji akses URL percakapan dengan akun ketiga; server harus mengembalikan 404.
 
 Chat memakai polling 4 detik (bukan WebSocket), sehingga pembaruan mendekati real-time dan sesuai model fungsi Vercel. Rate limit saat ini best-effort per instance; untuk pemakaian publik skala besar, ganti dengan Redis/Upstash dan tambahkan fitur blokir/laporkan pengguna serta moderasi pesan.
+
+
+## Pembaruan video, tema gelap, dan status pesan
+
+Versi ini menambahkan migrasi `20261116140000_report_video_uploads` untuk tabel `ReportVideo`. Sebelum push kode baru ke Production:
+
+1. Buat backup/branch database Neon Production.
+2. Pastikan `DATABASE_URL` dan `DIRECT_URL` lokal mengarah ke database/branch Production yang benar.
+3. Jalankan `npx prisma migrate status`.
+4. Jika migrasi lama sudah tercatat dan tidak ada failed migration, jalankan `npx prisma migrate deploy`.
+5. Jalankan `npx prisma generate`, `npm run typecheck`, dan `npm run build`.
+6. Push ke GitHub agar Vercel melakukan deployment.
+
+Migrasi baru hanya membuat tabel `ReportVideo` beserta index dan foreign key. Tidak ada `DROP`, `TRUNCATE`, atau perubahan data laporan lama. Jangan gunakan `prisma migrate reset` pada Production.
+
+Video diunggah langsung dari browser ke Cloudinary menggunakan signature server, sehingga file video tidak melewati batas body request Vercel. Tidak ada environment variable baru; konfigurasi Cloudinary yang sudah ada tetap digunakan.
