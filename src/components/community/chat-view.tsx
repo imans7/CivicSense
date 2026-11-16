@@ -161,8 +161,8 @@ export function ChatView({
                 <small className="chat-message-meta">
                   {new Date(message.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })}
                   {mine && (message.readAt
-                    ? <CheckCheck className="chat-read-check" size={15} aria-label="Pesan sudah dibaca" title="Dibaca" />
-                    : <Check className="chat-sent-check" size={14} aria-label="Pesan terkirim" title="Terkirim" />)}
+                    ? <CheckCheck className="chat-read-check" size={15} aria-label="Pesan sudah dibaca" />
+                    : <Check className="chat-sent-check" size={14} aria-label="Pesan terkirim" />)}
                 </small>
               </div>
             </div>

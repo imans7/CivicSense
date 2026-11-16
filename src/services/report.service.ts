@@ -59,7 +59,6 @@ export async function createReport(userId:string,input:z.infer<typeof reportSche
    if(sizeBytes>VIDEO_RULES.maxSizeBytes) throw new ReportError("Ukuran video maksimal 50MB");
    throw new ReportError("Metadata video tidak valid");
   }
-  const mimeType=format==="mov"?"video/quicktime":`video/${format}`;
   const playbackUrl=cloudinary.url(video.publicId,{resource_type:"video",secure:true,format:"mp4",transformation:[{quality:"auto"}]});
   videos.push({publicId:video.publicId,videoUrl:playbackUrl,mimeType:"video/mp4",sizeBytes,durationSeconds});
  }
