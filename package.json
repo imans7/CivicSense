@@ -17,11 +17,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1173.0",
+    "@aws-sdk/s3-request-presigner": "^3.1173.0",
     "@hookform/resolvers": "^3.10.0",
     "@prisma/client": "^6.19.0",
     "@radix-ui/react-slot": "^1.1.0",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
+    "cloudinary": "^2.5.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.468.0",
@@ -33,10 +36,7 @@
     "server-only": "^0.0.1",
     "sonner": "^2.0.0",
     "tailwind-merge": "^3.0.0",
-    "zod": "^3.25.0",
-    "cloudinary": "^2.5.1",
-    "@aws-sdk/client-s3": "^3.800.0",
-    "@aws-sdk/s3-request-presigner": "^3.800.0"
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
