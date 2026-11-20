@@ -128,3 +128,8 @@ Pemeriksaan **sintaks** TypeScript/TSX telah dijalankan; instalasi dependensi ti
 ## Pembaruan fitur terbaru
 
 Lihat `FITUR_VIDEO_DARK_MODE_CENTANG_BIRU_OPTIMASI.md` untuk panduan video laporan, dark mode, centang pesan dibaca, optimasi navigasi, dan migrasi Neon.
+
+
+## Video IDCloudHost Object Storage
+
+Gunakan `PANDUAN_IDCLOUDHOST_VIDEO_CIVICSENSE.md` untuk migrasi video Cloudinary → S3. Foto tetap Cloudinary dan database tetap Neon.

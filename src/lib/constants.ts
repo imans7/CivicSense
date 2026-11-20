@@ -42,5 +42,5 @@ export const IMAGE_MAX_DIMENSION = 1920;
 export const VIDEO_RULES = {
   maxDurationSeconds: 60,
   maxSizeBytes: 50 * 1024 * 1024, // 50 MiB
-  allowedMimeTypes: ["video/mp4", "video/webm", "video/quicktime"],
+  allowedMimeTypes: ["video/mp4"],
 } as const;

@@ -1,8 +1,9 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { calculatePriority } from "@/lib/priority";
 import { cloudinary } from "@/lib/cloudinary";
-import { VIDEO_RULES } from "@/lib/constants";
+import { verifyUploadedVideo, VideoStorageError } from "@/lib/s3-video";
 import { reportSchema,transitionSchema } from "@/lib/validators";
 import type { Role, ReportStatus } from "@prisma/client";
 import { z } from "zod";
@@ -16,7 +17,8 @@ type CloudinaryPhoto = {
  sizeBytes: number;
  imageType: "REPORT" | "RESOLUTION";
 };
-type CloudinaryVideo = {
+type StoredVideo = {
+ id: string;
  publicId: string;
  videoUrl: string;
  mimeType: string;
@@ -42,25 +44,17 @@ export async function createReport(userId:string,input:z.infer<typeof reportSche
   if(!resource || !resource.secure_url) throw new ReportError("Foto Cloudinary tidak ditemukan");
   photos.push({publicId:photo.publicId,imageUrl:resource.secure_url,mimeType:`image/${resource.format==="jpg"?"jpeg":resource.format}`,sizeBytes:resource.bytes,imageType:"REPORT" as const});
  }
- const videos: CloudinaryVideo[] = [];
+ const videos: StoredVideo[] = [];
  for(const video of input.videos){
-  if(!video.publicId.startsWith(`civicsense/report/${userId}/`)||video.publicId.includes("..")) throw new ReportError("Video bukan milik akun ini",403);
-  if(await prisma.reportVideo.findFirst({where:{publicId:video.publicId}})) throw new ReportError("Video telah digunakan",409);
-  const resource=await cloudinary.api.resource(video.publicId,{resource_type:"video"}).catch(()=>null);
-  if(!resource || !resource.secure_url) throw new ReportError("Video Cloudinary tidak ditemukan");
-  const durationSeconds=Number((resource as unknown as {duration?:number}).duration ?? 0);
-  const sizeBytes=Number(resource.bytes ?? 0);
-  const format=String(resource.format ?? "").toLowerCase();
-  const validFormat=["mp4","webm","mov"].includes(format);
-  if(!validFormat || !Number.isFinite(durationSeconds) || durationSeconds<=0 || durationSeconds>VIDEO_RULES.maxDurationSeconds || sizeBytes<=0 || sizeBytes>VIDEO_RULES.maxSizeBytes){
-   await cloudinary.uploader.destroy(video.publicId,{resource_type:"video",invalidate:true}).catch(()=>null);
-   if(!validFormat) throw new ReportError("Format video harus MP4, WebM, atau MOV");
-   if(durationSeconds>VIDEO_RULES.maxDurationSeconds) throw new ReportError("Durasi video maksimal 60 detik");
-   if(sizeBytes>VIDEO_RULES.maxSizeBytes) throw new ReportError("Ukuran video maksimal 50MB");
-   throw new ReportError("Metadata video tidak valid");
+  if(await prisma.reportVideo.findUnique({where:{publicId:video.publicId},select:{id:true}})) throw new ReportError("Video sudah digunakan pada laporan lain",409);
+  let verified;
+  try { verified=await verifyUploadedVideo(video.publicId,userId); }
+  catch(error){
+   if(error instanceof VideoStorageError) throw new ReportError(error.message,error.status);
+   throw new ReportError("Tidak bisa memverifikasi video di Object Storage",502);
   }
-  const playbackUrl=cloudinary.url(video.publicId,{resource_type:"video",secure:true,format:"mp4",transformation:[{quality:"auto"}]});
-  videos.push({publicId:video.publicId,videoUrl:playbackUrl,mimeType:"video/mp4",sizeBytes,durationSeconds});
+  const id=randomUUID();
+  videos.push({id,publicId:verified.publicId,videoUrl:`/api/videos/${id}/stream`,mimeType:verified.mimeType,sizeBytes:verified.sizeBytes,durationSeconds:verified.durationSeconds});
  }
  const priority=calculatePriority(input);
  const now=new Date().getFullYear();
@@ -70,7 +64,6 @@ export async function createReport(userId:string,input:z.infer<typeof reportSche
  });
  // Menghapus tag pending setelah tersimpan. Jika gagal, foto tetap tercatat dan tidak akan dihapus oleh aplikasi.
  await Promise.allSettled(photos.map(photo=>cloudinary.uploader.remove_tag("pending",[photo.publicId])));
- await Promise.allSettled(videos.map(video=>cloudinary.uploader.remove_tag("pending",[video.publicId],{resource_type:"video"})));
  return report;
 }
 export async function changeStatus(reportId:string,actor:{id:string;role:Role},input:z.infer<typeof transitionSchema>){
