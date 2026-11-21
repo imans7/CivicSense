@@ -60,6 +60,7 @@ model User {
 
   reportsCreated  Report[]        @relation("ReportReporter")
   reportsAssigned Report[]        @relation("ReportOfficer")
+  completionEvidenceUploaded ReportCompletionEvidence[] @relation("CompletionEvidenceUploader")
   histories       ReportHistory[]
   sessions        Session[]
   comments        Comment[]
@@ -125,6 +126,7 @@ model Report {
   duplicates  Report[] @relation("ReportDuplicates")
 
   images    ReportImage[]
+  completionEvidence ReportCompletionEvidence?
   videos    ReportVideo[]
   histories ReportHistory[]
   comments  Comment[]
@@ -153,6 +155,28 @@ model ReportImage {
   report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@index([reportId])
+}
+
+// Bukti penyelesaian disimpan sebagai satu pasangan wajib: foto sebelum dan sesudah.
+// Tabel terpisah menjaga foto laporan awal dan bukti penyelesaian lama tetap utuh.
+model ReportCompletionEvidence {
+  id              String   @id @default(cuid())
+  reportId        String   @unique
+  uploadedById    String
+  beforeImageUrl  String   @db.VarChar(500)
+  beforePublicId  String   @unique @db.VarChar(255)
+  beforeMimeType  String   @db.VarChar(50)
+  beforeSizeBytes Int
+  afterImageUrl   String   @db.VarChar(500)
+  afterPublicId   String   @unique @db.VarChar(255)
+  afterMimeType   String   @db.VarChar(50)
+  afterSizeBytes  Int
+  createdAt       DateTime @default(now())
+
+  report     Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  uploadedBy User   @relation("CompletionEvidenceUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([uploadedById, createdAt])
 }
 
 model ReportHistory {

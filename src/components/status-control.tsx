@@ -39,7 +39,8 @@ export function StatusControl({ reportId, status, role, officers }: StatusContro
       : [];
 
   const [selected, setSelected] = useState<ReportStatus | "">(options[0] ?? "");
-  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [beforeImages, setBeforeImages] = useState<UploadedImage[]>([]);
+  const [afterImages, setAfterImages] = useState<UploadedImage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -62,7 +63,7 @@ export function StatusControl({ reportId, status, role, officers }: StatusContro
       status: ReportStatus;
       note?: string;
       assignedToId?: string;
-      images?: { publicId: string }[];
+      completionEvidence?: { beforePublicId: string; afterPublicId: string };
     } = { status: selected };
 
     if (note) body.note = note;
@@ -75,11 +76,18 @@ export function StatusControl({ reportId, status, role, officers }: StatusContro
       body.assignedToId = officerId;
     }
     if (selected === "RESOLVED") {
-      if (images.length === 0) {
-        setError("Unggah minimal satu foto penyelesaian.");
+      if (beforeImages.length !== 1 || afterImages.length !== 1) {
+        setError("Unggah tepat dua foto penyelesaian: satu Before dan satu After.");
         return;
       }
-      body.images = images.map(({ publicId }) => ({ publicId }));
+      if (beforeImages[0].publicId === afterImages[0].publicId) {
+        setError("Foto Before dan After harus berbeda.");
+        return;
+      }
+      body.completionEvidence = {
+        beforePublicId: beforeImages[0].publicId,
+        afterPublicId: afterImages[0].publicId,
+      };
     }
 
     setBusy(true);
@@ -98,7 +106,8 @@ export function StatusControl({ reportId, status, role, officers }: StatusContro
         const firstDetail = Object.values(result.details ?? {}).flat()[0];
         throw new Error(result.error || firstDetail || `Gagal mengubah status (HTTP ${response.status}).`);
       }
-      setImages([]);
+      setBeforeImages([]);
+      setAfterImages([]);
       setSaved(true);
       router.refresh();
     } catch (cause) {
@@ -151,8 +160,23 @@ export function StatusControl({ reportId, status, role, officers }: StatusContro
       </label>
       {selected === "RESOLVED" && (
         <div className="ticket-evidence">
-          <b>Bukti foto penyelesaian (wajib)</b>
-          <ImageUploader type="RESOLUTION" maxFiles={5} value={images} onChange={setImages} />
+          <b>Bukti foto penyelesaian (wajib 2 foto)</b>
+          <p>Ambil foto dari lokasi dan sudut yang jelas. Foto Before menunjukkan kondisi awal, sedangkan foto After menunjukkan hasil pekerjaan.</p>
+          <div className="completion-upload-grid">
+            <div className="completion-upload-slot">
+              <strong>1. Foto Before</strong>
+              <span>Kondisi sebelum dikerjakan</span>
+              <ImageUploader type="RESOLUTION" maxFiles={1} value={beforeImages} onChange={setBeforeImages} disabled={busy} />
+              {beforeImages.length === 1 && <small className="completion-upload-ready">Foto Before siap</small>}
+            </div>
+            <div className="completion-upload-slot">
+              <strong>2. Foto After</strong>
+              <span>Kondisi setelah dikerjakan</span>
+              <ImageUploader type="RESOLUTION" maxFiles={1} value={afterImages} onChange={setAfterImages} disabled={busy} />
+              {afterImages.length === 1 && <small className="completion-upload-ready">Foto After siap</small>}
+            </div>
+          </div>
+          <p className="completion-upload-count">Kelengkapan bukti: {beforeImages.length + afterImages.length}/2 foto.</p>
         </div>
       )}
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -160,7 +184,7 @@ export function StatusControl({ reportId, status, role, officers }: StatusContro
       <button
         type="submit"
         className="primary-action"
-        disabled={busy || (selected === "RESOLVED" && images.length === 0)}
+        disabled={busy || (selected === "RESOLVED" && (beforeImages.length !== 1 || afterImages.length !== 1))}
       >
         <Send size={15} /> {busy ? "Menyimpan..." : "Simpan status"}
       </button>

@@ -17,5 +17,8 @@ export const transitionSchema = z.object({
  status: z.enum(["VERIFIED", "REJECTED", "ASSIGNED", "IN_PROGRESS", "RESOLVED"]),
  note: z.string().trim().max(500).nullish().transform(value => value || undefined),
  assignedToId: z.string().trim().nullish().transform(value => value || undefined),
- images: z.array(z.object({publicId:z.string().min(1).max(255)})).max(5).optional(),
+ completionEvidence: z.object({
+  beforePublicId: z.string().trim().min(1).max(255),
+  afterPublicId: z.string().trim().min(1).max(255),
+ }).optional(),
 });

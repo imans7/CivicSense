@@ -6,6 +6,7 @@ type Post = {
   user: { id: string; name: string; role: Role; avatarUrl: string | null };
   category: { name: string }; images: { imageUrl: string }[];
   videos: { videoUrl: string; durationSeconds: number; mimeType: string }[];
+  completionEvidence: { beforeImageUrl: string; afterImageUrl: string; createdAt: Date; uploadedBy: { name: string } } | null;
   _count: { comments: number; likes: number; dislikes: number };
 };
 export function Feed({ posts, viewerId, liked, disliked, saved }: { posts: Post[]; viewerId?: string; liked: Set<string>; disliked: Set<string>; saved: Set<string> }) {

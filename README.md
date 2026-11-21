@@ -14,6 +14,7 @@ Versi pengembangan lanjutan dari proyek `PROGRAM.zip` (Next.js 15, Prisma 6, Neo
 - Dashboard admin: verifikasi, penolakan, penugasan dan pemantauan.
 - Dashboard petugas: mulai penanganan dan selesaikan dengan foto bukti.
 - Peta interaktif sederhana berbasis OpenStreetMap (pilih laporan untuk menampilkan titik).
+- Bukti penyelesaian wajib berupa dua foto Before dan After; bukti tampil pada feed warga, detail laporan, panel admin, dan riwayat petugas. Lihat [BUKTI_PENYELESAIAN_BEFORE_AFTER.md](./BUKTI_PENYELESAIAN_BEFORE_AFTER.md) sebelum menerapkan migrasi tambahan.
 
 ## Cara menjalankan
 1. Pasang **Node.js 20 atau 22**. Jalankan `npm install`.
@@ -69,7 +70,7 @@ pengalaman forum publik (beranda, jelajahi, simpan, detail), tanpa mengganti alu
 
 ## Tambahan: Dashboard Admin/Petugas + Profil Publik (versi forum 2)
 
-Seluruh rute dashboard kini memakai kerangka forum yang sama dengan beranda komunitas; sidebar dan menu bawah menampilkan fitur sesuai peran. Administrator bisa mengelola antrean verifikasi, penugasan, ekspor CSV dan direktori akun. Petugas bisa melihat tugas aktif, mengirim status/bukti foto penyelesaian, dan memeriksa riwayat pekerjaan.
+Seluruh rute dashboard kini memakai kerangka forum yang sama dengan beranda komunitas; sidebar dan menu bawah menampilkan fitur sesuai peran. Administrator bisa mengelola antrean verifikasi, penugasan, ekspor CSV dan direktori akun. Petugas bisa melihat tugas aktif, memperbarui status, wajib mengunggah sepasang foto Before dan After sebelum menandai tugas selesai, serta memeriksa riwayat pekerjaan.
 
 **Halaman baru:**
 - `/admin` — pusat kendali, KPI, filter status, verifikasi, penugasan.
@@ -101,7 +102,7 @@ Seluruh rute dashboard kini memakai kerangka forum yang sama dengan beranda komu
 3. Buka profil penulis dari feed atau komentar -> tampil foto profil, bio, 4 metrik dan feed laporan.
 4. Semua peran mengedit nama, bio, lokasi, foto profil sendiri -> profil lain dapat membacanya; email/password tidak ditampilkan.
 5. Admin memverifikasi/menolak (dengan catatan), kemudian menugaskan ke petugas -> petugas melihatnya di `/officer`.
-6. Petugas memulai penanganan, menambah bukti foto Cloudinary, menyelesaikan -> tugas pindah ke `/officer/history`.
+6. Petugas memulai penanganan, mengunggah tepat satu foto Before dan satu foto After melalui Cloudinary, lalu menyelesaikan -> bukti tampil pada laporan warga, feed, dan panel admin; tugas pindah ke `/officer/history`.
 7. Admin mencoba mengubah peran petugas yang masih punya tugas aktif -> permintaan ditolak; admin tidak dapat mengubah peran/status akun sendiri.
 8. Akun non-admin memanggil API pengelolaan akun -> HTTP 403; pengguna anonim mengedit profil -> HTTP 401.
 9. Periksa responsif desktop dan mobile pada `/admin`, `/officer`, `/users/[id]`, `/settings/profile`.

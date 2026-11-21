@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Bookmark, ArrowBigUp, MapPin, MessageCircle, Share2, BadgeCheck, ArrowBigDown } from "lucide-react";
 import { PhotoLightbox } from "@/components/community/photo-lightbox";
+import { CompletionEvidenceGallery } from "@/components/community/completion-evidence-gallery";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/constants";
 import type { PriorityLevel, ReportStatus, Role } from "@prisma/client";
 import { UserAvatar } from "@/components/community/user-avatar";
@@ -13,6 +14,7 @@ type Post = {
   status: ReportStatus; priorityLevel: PriorityLevel; createdAt: Date | string;
   user: { id: string; name: string; role: Role; avatarUrl: string | null }; category: { name: string };
   images: { imageUrl: string }[]; videos: { videoUrl: string; durationSeconds: number; mimeType: string }[];
+  completionEvidence: { beforeImageUrl: string; afterImageUrl: string; createdAt: Date | string; uploadedBy: { name: string } } | null;
   _count: { comments: number; likes: number; dislikes: number };
 };
 export function PostCard({ post, loggedIn, initiallyLiked = false, initiallyDisliked = false, initiallySaved = false }: {
@@ -72,6 +74,7 @@ export function PostCard({ post, loggedIn, initiallyLiked = false, initiallyDisl
           <span className="post-video-duration">{Math.ceil(video.durationSeconds)} detik</span>
         </div>)}
       </div>}
+      {post.status === "RESOLVED" && post.completionEvidence && <CompletionEvidenceGallery evidence={post.completionEvidence} />}
       <div className="post-badges"><span className={`status-pill status-${post.status.toLowerCase()}`}><i/>{STATUS_LABELS[post.status]}</span><span className="priority-pill">Prioritas {PRIORITY_LABELS[post.priorityLevel]}</span></div>
       <div className="post-actions">
         <Link href={`/reports/${post.id}#diskusi`} title="Komentar" className="post-action"><MessageCircle size={19}/><span>{post._count.comments}</span></Link>

@@ -129,12 +129,15 @@ export async function deletePendingImage(params: {
     FOLDER_TYPES.some((t) => publicId.startsWith(`civicsense/${t}/${userId}/`));
   if (!ownFolder) throw new ImageError("Foto tidak ditemukan", 404);
 
-  const attached = await prisma.reportImage.findFirst({
-    where: { publicId },
-    select: { id: true },
-  });
-  const isAvatarInUse = await prisma.user.findFirst({ where: { avatarPublicId: publicId }, select: { id: true } });
-  if (attached || isAvatarInUse) {
+  const [attached, completionAttached, isAvatarInUse] = await Promise.all([
+    prisma.reportImage.findFirst({ where: { publicId }, select: { id: true } }),
+    prisma.reportCompletionEvidence.findFirst({
+      where: { OR: [{ beforePublicId: publicId }, { afterPublicId: publicId }] },
+      select: { id: true },
+    }),
+    prisma.user.findFirst({ where: { avatarPublicId: publicId }, select: { id: true } }),
+  ]);
+  if (attached || completionAttached || isAvatarInUse) {
     throw new ImageError(
       "Foto sedang digunakan dan tidak dapat dihapus",
       409

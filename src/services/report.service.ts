@@ -25,6 +25,12 @@ type StoredVideo = {
  sizeBytes: number;
  durationSeconds: number;
 };
+type CompletionPhoto = {
+ publicId: string;
+ imageUrl: string;
+ mimeType: string;
+ sizeBytes: number;
+};
 
 export class ReportError extends Error { constructor(message:string,public status=400){super(message);} }
 const allowed = (old:ReportStatus, next:ReportStatus, role:Role) => {
@@ -98,24 +104,73 @@ export async function changeStatus(reportId:string,actor:{id:string;role:Role},i
   if(!officer)throw new ReportError("Petugas tidak valid");
  }
  if(["REJECTED","RESOLVED"].includes(input.status)&&!input.note?.trim())throw new ReportError("Catatan wajib untuk penolakan dan penyelesaian");
- const photos: CloudinaryPhoto[] = [];
- if(input.images?.length){
-  if(input.status!=="RESOLVED")throw new ReportError("Foto penanganan hanya dapat diunggah saat penyelesaian");
-  if(input.images.some(img=>!img.publicId.startsWith(`civicsense/resolution/${actor.id}/`)||img.publicId.includes("..")))throw new ReportError("Foto tidak sah",403);
-  const resources=await Promise.all(input.images.map(img=>cloudinary.api.resource(img.publicId).catch(()=>null)));
-  for(let index=0;index<resources.length;index++){
-   const resource=resources[index];
-   if(!resource?.secure_url)throw new ReportError("Foto penyelesaian tidak ditemukan");
-   photos.push({publicId:input.images[index].publicId,imageUrl:resource.secure_url,mimeType:`image/${resource.format==="jpg"?"jpeg":resource.format}`,sizeBytes:resource.bytes,imageType:"RESOLUTION" as const});
+ let completionEvidence: { before: CompletionPhoto; after: CompletionPhoto } | null = null;
+ if(input.status === "RESOLVED") {
+  const evidence = input.completionEvidence;
+  if(!evidence?.beforePublicId || !evidence.afterPublicId) {
+   throw new ReportError("Penyelesaian wajib menyertakan dua foto: Before dan After.");
   }
+  if(evidence.beforePublicId === evidence.afterPublicId) {
+   throw new ReportError("Foto Before dan After harus berupa dua foto yang berbeda.");
+  }
+  const ownFolder = `civicsense/resolution/${actor.id}/`;
+  const ids = [evidence.beforePublicId, evidence.afterPublicId];
+  if(ids.some(id => !id.startsWith(ownFolder) || id.includes(".."))) {
+   throw new ReportError("Foto bukti bukan milik akun yang sedang masuk.",403);
+  }
+
+  const [usedLegacy, usedCompletion, resources] = await Promise.all([
+   prisma.reportImage.findMany({ where: { publicId: { in: ids } }, select: { publicId: true } }),
+   prisma.reportCompletionEvidence.findFirst({
+    where: { OR: [{ beforePublicId: { in: ids } }, { afterPublicId: { in: ids } }] },
+    select: { id: true },
+   }),
+   Promise.all(ids.map(id => cloudinary.api.resource(id).catch(() => null))),
+  ]);
+  if(usedLegacy.length || usedCompletion) throw new ReportError("Salah satu foto sudah digunakan sebagai bukti laporan lain.",409);
+  const [beforeResource, afterResource] = resources;
+  if(!beforeResource?.secure_url || !afterResource?.secure_url) {
+   throw new ReportError("Foto Before atau After tidak ditemukan di Cloudinary.");
+  }
+  completionEvidence = {
+   before: {
+    publicId: evidence.beforePublicId,
+    imageUrl: beforeResource.secure_url,
+    mimeType: `image/${beforeResource.format === "jpg" ? "jpeg" : beforeResource.format}`,
+    sizeBytes: beforeResource.bytes,
+   },
+   after: {
+    publicId: evidence.afterPublicId,
+    imageUrl: afterResource.secure_url,
+    mimeType: `image/${afterResource.format === "jpg" ? "jpeg" : afterResource.format}`,
+    sizeBytes: afterResource.bytes,
+   },
+  };
+ } else if(input.completionEvidence) {
+  throw new ReportError("Foto Before dan After hanya dapat dikirim saat menyelesaikan laporan.");
  }
- if(input.status==="RESOLVED" && !photos.length)throw new ReportError("Unggah minimal satu foto hasil penanganan");
  // Update kondisional mencegah transisi status yang saling balapan.
  await prisma.$transaction(async tx=>{
   const update=await tx.report.updateMany({where:{id:reportId,status:report.status},data:{status:input.status,assignedToId,verifiedAt:input.status==="VERIFIED"?new Date():report.verifiedAt,resolvedAt:input.status==="RESOLVED"?new Date():report.resolvedAt}});
   if(update.count!==1)throw new ReportError("Status telah berubah. Muat ulang halaman",409);
   await tx.reportHistory.create({data:{reportId,userId:actor.id,oldStatus:report.status,newStatus:input.status,note:input.note||null}});
-  if(photos.length)await tx.reportImage.createMany({data:photos.map(p=>({...p,reportId}))});
+  if(completionEvidence) await tx.reportCompletionEvidence.create({data:{
+   reportId,
+   uploadedById:actor.id,
+   beforeImageUrl:completionEvidence.before.imageUrl,
+   beforePublicId:completionEvidence.before.publicId,
+   beforeMimeType:completionEvidence.before.mimeType,
+   beforeSizeBytes:completionEvidence.before.sizeBytes,
+   afterImageUrl:completionEvidence.after.imageUrl,
+   afterPublicId:completionEvidence.after.publicId,
+   afterMimeType:completionEvidence.after.mimeType,
+   afterSizeBytes:completionEvidence.after.sizeBytes,
+  }});
  });
- await Promise.allSettled(photos.map(photo=>cloudinary.uploader.remove_tag("pending",[photo.publicId])));
+ if(completionEvidence) {
+  await Promise.allSettled([
+   cloudinary.uploader.remove_tag("pending",[completionEvidence.before.publicId]),
+   cloudinary.uploader.remove_tag("pending",[completionEvidence.after.publicId]),
+  ]);
+ }
 }
