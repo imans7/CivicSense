@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Bookmark, Heart, MapPin, MessageCircle, Share2, BadgeCheck, ThumbsDown } from "lucide-react";
+import { Bookmark, ArrowBigUp, MapPin, MessageCircle, Share2, BadgeCheck, ArrowBigDown } from "lucide-react";
+import { PhotoLightbox } from "@/components/community/photo-lightbox";
 import { PRIORITY_LABELS, STATUS_LABELS } from "@/lib/constants";
 import type { PriorityLevel, ReportStatus, Role } from "@prisma/client";
 import { UserAvatar } from "@/components/community/user-avatar";
@@ -24,6 +25,7 @@ export function PostCard({ post, loggedIn, initiallyLiked = false, initiallyDisl
   const [likes, setLikes] = useState(post._count.likes);
   const [dislikes, setDislikes] = useState(post._count.dislikes);
   const [busy, setBusy] = useState(false);
+  const [openPhoto, setOpenPhoto] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   async function toggle(kind: "like" | "dislike" | "bookmark") {
     if (!loggedIn) { router.push("/login"); return; }
@@ -58,9 +60,12 @@ export function PostCard({ post, loggedIn, initiallyLiked = false, initiallyDisl
       <div className="post-topic">{post.category.name} <span>·</span> {post.reportNumber}</div>
       <Link className="post-link" href={`/reports/${post.id}`}><h2>{post.title}</h2><p className="post-description">{post.description}</p></Link>
       {post.address && <div className="post-location"><MapPin size={15}/><span>{post.address}</span></div>}
-      {post.images.length > 0 && <Link href={`/reports/${post.id}`} className={`post-photos count-${Math.min(post.images.length, 4)}`}>
-        {post.images.map((im, i) => <img key={i} src={im.imageUrl} alt={`Foto laporan ${i + 1}`} loading="lazy" />)}
-      </Link>}
+      {post.images.length > 0 && <div className={`post-photos count-${Math.min(post.images.length, 4)}`}>
+        {post.images.map((im, i) => <button key={im.imageUrl} type="button" className="post-photo-button" onClick={() => setOpenPhoto(i)} aria-label={`Perbesar foto laporan ${i + 1}`}>
+          <img src={im.imageUrl} alt={`Foto laporan ${i + 1}`} loading="lazy" decoding="async" />
+        </button>)}
+      </div>}
+      {openPhoto !== null && <PhotoLightbox photos={post.images} index={openPhoto} onChange={setOpenPhoto} onClose={() => setOpenPhoto(null)} />}
       {post.videos?.length > 0 && <div className="post-videos">
         {post.videos.map((video) => <div className="post-video-frame" key={video.videoUrl}>
           <video src={video.videoUrl} controls playsInline preload="none" aria-label={`Video bukti laporan ${post.reportNumber}`} />
@@ -70,8 +75,8 @@ export function PostCard({ post, loggedIn, initiallyLiked = false, initiallyDisl
       <div className="post-badges"><span className={`status-pill status-${post.status.toLowerCase()}`}><i/>{STATUS_LABELS[post.status]}</span><span className="priority-pill">Prioritas {PRIORITY_LABELS[post.priorityLevel]}</span></div>
       <div className="post-actions">
         <Link href={`/reports/${post.id}#diskusi`} title="Komentar" className="post-action"><MessageCircle size={19}/><span>{post._count.comments}</span></Link>
-        <button type="button" className={`post-action ${liked ? "active-like" : ""}`} onClick={() => toggle("like")} disabled={busy} aria-label={liked ? "Batalkan like" : "Like laporan"} aria-pressed={liked}><Heart size={19} fill={liked ? "currentColor" : "none"}/><span>{likes}</span></button>
-        <button type="button" className={`post-action ${disliked ? "active-dislike" : ""}`} onClick={() => toggle("dislike")} disabled={busy} aria-label={disliked ? "Batalkan dislike" : "Dislike laporan"} aria-pressed={disliked}><ThumbsDown size={18} fill={disliked ? "currentColor" : "none"}/><span>{dislikes}</span></button>
+        <button type="button" className={`post-action ${liked ? "active-like" : ""}`} onClick={() => toggle("like")} disabled={busy} aria-label={liked ? "Batalkan Up" : "Up laporan"} aria-pressed={liked}><ArrowBigUp size={19} fill={liked ? "currentColor" : "none"}/><span>Up · {likes}</span></button>
+        <button type="button" className={`post-action ${disliked ? "active-dislike" : ""}`} onClick={() => toggle("dislike")} disabled={busy} aria-label={disliked ? "Batalkan Down" : "Down laporan"} aria-pressed={disliked}><ArrowBigDown size={18} fill={disliked ? "currentColor" : "none"}/><span>Down · {dislikes}</span></button>
         <button type="button" className="post-action" onClick={share} aria-label="Bagikan laporan"><Share2 size={19}/><span className="action-word">Bagikan</span></button>
         <button type="button" className={`post-action bookmark-action ${saved ? "active-save" : ""}`} onClick={() => toggle("bookmark")} disabled={busy} aria-label={saved ? "Hapus dari tersimpan" : "Simpan laporan"} aria-pressed={saved}><Bookmark size={19} fill={saved ? "currentColor" : "none"}/></button>
       </div>

@@ -133,3 +133,7 @@ Lihat `FITUR_VIDEO_DARK_MODE_CENTANG_BIRU_OPTIMASI.md` untuk panduan video lapor
 ## Video IDCloudHost Object Storage
 
 Gunakan `PANDUAN_IDCLOUDHOST_VIDEO_CIVICSENSE.md` untuk migrasi video Cloudinary → S3. Foto tetap Cloudinary dan database tetap Neon.
+
+
+## Pembaruan fitur sosial
+Lihat `FITUR_SOSIAL_DAN_PENCARIAN_2026_11_20.md` untuk fitur lightbox foto, filter Beranda, pencarian, follow, blokir, Up, migrasi aman, dan pengujian.

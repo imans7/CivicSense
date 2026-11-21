@@ -1,5 +1,37 @@
+import "server-only";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@/lib/session";
+
+
+const loadActiveCategories = unstable_cache(
+  async () => prisma.category.findMany({
+    where: { isActive: true },
+    take: 5,
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  }),
+  ["civicsense-active-categories-v1"],
+  { revalidate: 300, tags: ["civicsense-categories"] },
+);
+
+export function getActiveCategories() {
+  return loadActiveCategories();
+}
+
+const loadAllActiveCategories = unstable_cache(
+  async () => prisma.category.findMany({
+    where: { isActive: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  }),
+  ["civicsense-all-active-categories-v1"],
+  { revalidate: 300, tags: ["civicsense-categories"] },
+);
+
+export function getAllActiveCategories() {
+  return loadAllActiveCategories();
+}
 
 export const feedInclude = {
   user: { select: { id: true, name: true, role: true, avatarUrl: true } },

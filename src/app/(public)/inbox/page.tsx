@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { InboxView } from "@/components/community/inbox-view";
+import { excludedUserIds } from "@/lib/social";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +10,10 @@ export default async function InboxPage() {
   const user = await currentUser();
   if (!user) redirect("/login");
 
+  const excluded=await excludedUserIds(user.id);
   const [notifications, conversations] = await Promise.all([
     prisma.notification.findMany({
-      where: { recipientId: user.id },
+      where: { recipientId: user.id, ...(excluded.length?{actorId:{notIn:excluded}}:{}) },
       include: {
         actor: { select: { id: true, name: true, role: true, avatarUrl: true } },
         report: { select: { id: true, title: true, reportNumber: true } },
@@ -21,7 +23,7 @@ export default async function InboxPage() {
       take: 50,
     }),
     prisma.conversation.findMany({
-      where: { OR: [{ userOneId: user.id }, { userTwoId: user.id }] },
+      where: { AND: [{OR:[{userOneId:user.id},{userTwoId:user.id}]}, ...(excluded.length?[{userOneId:{notIn:excluded},userTwoId:{notIn:excluded}}]:[])] },
       include: {
         userOne: { select: { id: true, name: true, role: true, avatarUrl: true } },
         userTwo: { select: { id: true, name: true, role: true, avatarUrl: true } },

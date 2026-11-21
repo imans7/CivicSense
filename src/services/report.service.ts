@@ -33,20 +33,40 @@ const allowed = (old:ReportStatus, next:ReportStatus, role:Role) => {
  return false;
 };
 export async function createReport(userId:string,input:z.infer<typeof reportSchema>){
- const category=await prisma.category.findFirst({where:{id:input.categoryId,isActive:true}});
+ const imageIds=input.images.map(photo=>photo.publicId);
+ const videoIds=input.videos.map(video=>video.publicId);
+
+ if(new Set(imageIds).size!==imageIds.length) throw new ReportError("Foto yang sama tidak boleh dipilih lebih dari sekali");
+ if(new Set(videoIds).size!==videoIds.length) throw new ReportError("Video yang sama tidak boleh dipilih lebih dari sekali");
+ if(imageIds.some(id=>!id.startsWith(`civicsense/report/${userId}/`)||id.includes(".."))) throw new ReportError("Foto bukan milik akun ini",403);
+
+ // Validasi kategori dan cek duplikasi dilakukan paralel untuk mengurangi round-trip database.
+ const [category,existingPhotos,existingVideos]=await Promise.all([
+  prisma.category.findFirst({where:{id:input.categoryId,isActive:true},select:{id:true}}),
+  imageIds.length?prisma.reportImage.findMany({where:{publicId:{in:imageIds}},select:{publicId:true}}):Promise.resolve([]),
+  videoIds.length?prisma.reportVideo.findMany({where:{publicId:{in:videoIds}},select:{publicId:true}}):Promise.resolve([]),
+ ]);
  if(!category) throw new ReportError("Kategori tidak ditemukan");
- // Ambil metadata foto dari Cloudinary, jangan mempercayai URL/ukuran yang dikirim browser.
- const photos: CloudinaryPhoto[] = [];
- for(const photo of input.images){
-  if(!photo.publicId.startsWith(`civicsense/report/${userId}/`)||photo.publicId.includes("..")) throw new ReportError("Foto bukan milik akun ini",403);
-  if(await prisma.reportImage.findFirst({where:{publicId:photo.publicId}})) throw new ReportError("Foto telah digunakan",409);
-  const resource=await cloudinary.api.resource(photo.publicId,{resource_type:"image"}).catch(()=>null);
-  if(!resource || !resource.secure_url) throw new ReportError("Foto Cloudinary tidak ditemukan");
-  photos.push({publicId:photo.publicId,imageUrl:resource.secure_url,mimeType:`image/${resource.format==="jpg"?"jpeg":resource.format}`,sizeBytes:resource.bytes,imageType:"REPORT" as const});
- }
- const videos: StoredVideo[] = [];
+ if(existingPhotos.length) throw new ReportError("Foto telah digunakan",409);
+ if(existingVideos.length) throw new ReportError("Video sudah digunakan pada laporan lain",409);
+
+ // Maksimal lima foto; metadata Cloudinary dapat diperiksa paralel setelah kepemilikan tervalidasi.
+ const photoResources=await Promise.all(input.images.map(photo=>
+  cloudinary.api.resource(photo.publicId,{resource_type:"image"}).catch(()=>null)
+ ));
+ const photos:CloudinaryPhoto[]=photoResources.map((resource,index)=>{
+  if(!resource?.secure_url) throw new ReportError("Foto Cloudinary tidak ditemukan");
+  return {
+   publicId:input.images[index].publicId,
+   imageUrl:resource.secure_url,
+   mimeType:`image/${resource.format==="jpg"?"jpeg":resource.format}`,
+   sizeBytes:resource.bytes,
+   imageType:"REPORT" as const,
+  };
+ });
+
+ const videos:StoredVideo[]=[];
  for(const video of input.videos){
-  if(await prisma.reportVideo.findUnique({where:{publicId:video.publicId},select:{id:true}})) throw new ReportError("Video sudah digunakan pada laporan lain",409);
   let verified;
   try { verified=await verifyUploadedVideo(video.publicId,userId); }
   catch(error){
@@ -74,18 +94,19 @@ export async function changeStatus(reportId:string,actor:{id:string;role:Role},i
  const assignedToId=input.status==="ASSIGNED"?input.assignedToId:report.assignedToId;
  if(input.status==="ASSIGNED"){
   if(!assignedToId)throw new ReportError("Pilih petugas terlebih dahulu");
-  const officer=await prisma.user.findFirst({where:{id:assignedToId,role:"OFFICER",isActive:true}});
+  const officer=await prisma.user.findFirst({where:{id:assignedToId,role:"OFFICER",isActive:true},select:{id:true}});
   if(!officer)throw new ReportError("Petugas tidak valid");
  }
  if(["REJECTED","RESOLVED"].includes(input.status)&&!input.note?.trim())throw new ReportError("Catatan wajib untuk penolakan dan penyelesaian");
  const photos: CloudinaryPhoto[] = [];
  if(input.images?.length){
   if(input.status!=="RESOLVED")throw new ReportError("Foto penanganan hanya dapat diunggah saat penyelesaian");
-  for(const img of input.images){
-   if(!img.publicId.startsWith(`civicsense/resolution/${actor.id}/`)||img.publicId.includes(".."))throw new ReportError("Foto tidak sah",403);
-   const resource=await cloudinary.api.resource(img.publicId).catch(()=>null);
+  if(input.images.some(img=>!img.publicId.startsWith(`civicsense/resolution/${actor.id}/`)||img.publicId.includes("..")))throw new ReportError("Foto tidak sah",403);
+  const resources=await Promise.all(input.images.map(img=>cloudinary.api.resource(img.publicId).catch(()=>null)));
+  for(let index=0;index<resources.length;index++){
+   const resource=resources[index];
    if(!resource?.secure_url)throw new ReportError("Foto penyelesaian tidak ditemukan");
-   photos.push({publicId:img.publicId,imageUrl:resource.secure_url,mimeType:`image/${resource.format==="jpg"?"jpeg":resource.format}`,sizeBytes:resource.bytes,imageType:"RESOLUTION" as const});
+   photos.push({publicId:input.images[index].publicId,imageUrl:resource.secure_url,mimeType:`image/${resource.format==="jpg"?"jpeg":resource.format}`,sizeBytes:resource.bytes,imageType:"RESOLUTION" as const});
   }
  }
  if(input.status==="RESOLVED" && !photos.length)throw new ReportError("Unggah minimal satu foto hasil penanganan");

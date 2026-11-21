@@ -71,6 +71,10 @@ model User {
   messagesSent Message[]
   conversationsAsUserOne Conversation[] @relation("ConversationUserOne")
   conversationsAsUserTwo Conversation[] @relation("ConversationUserTwo")
+  following UserFollow[] @relation("UserFollowing")
+  followers UserFollow[] @relation("UserFollowers")
+  blocksMade UserBlock[] @relation("UserBlocksMade")
+  blockedBy UserBlock[] @relation("UserBlockedBy")
 
   @@index([role, isActive])
 }
@@ -299,4 +303,31 @@ model ReportVideo {
   report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@index([reportId])
+}
+
+// Relasi follow tidak mengubah data like/report yang sudah ada.
+model UserFollow {
+  followerId String
+  followingId String
+  createdAt DateTime @default(now())
+
+  follower User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId, createdAt])
+  @@index([followerId, createdAt])
+}
+
+// Blokir dua arah untuk visibilitas dan percakapan pengguna.
+model UserBlock {
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("UserBlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("UserBlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId, createdAt])
 }

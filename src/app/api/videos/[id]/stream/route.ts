@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@/lib/session";
 import { decodeVideoKey, signVideoPlayback } from "@/lib/s3-video";
+import { blockedBetween } from "@/lib/social";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,8 +18,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
   if (!video) return NextResponse.json({ error: "Video tidak ditemukan" }, { status: 404 });
 
+  const user = await currentUser();
+  if (user?.role !== "ADMIN" && await blockedBetween(user?.id, video.report.userId)) return NextResponse.json({ error: "Video tidak tersedia" }, { status: 404 });
   if (video.report.status === "REJECTED") {
-    const user = await currentUser();
     if (!user || (user.id !== video.report.userId && user.role !== "ADMIN")) {
       return NextResponse.json({ error: "Video tidak tersedia" }, { status: 404 });
     }

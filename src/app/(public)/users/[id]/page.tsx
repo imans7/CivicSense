@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BadgeCheck, CalendarDays, MapPin, Settings2, ShieldCheck, ThumbsDown, Heart, FileText, CircleHelp } from "lucide-react";
+import { ArrowLeft, Ban, BadgeCheck, CalendarDays, MapPin, Settings2, ShieldCheck, ArrowBigDown, ArrowBigUp, FileText, CircleHelp } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@/lib/session";
 import { feedInclude, interactionSets } from "@/lib/community";
 import { Feed } from "@/components/community/feed";
 import { LogoutButton } from "@/components/logout-button";
 import { UserAvatar } from "@/components/community/user-avatar";
-import { StartConversationButton } from "@/components/community/start-conversation-button";
+import { FollowBlockControls } from "@/components/community/follow-block-controls";
 import { getProfileStats, profileHandle, roleCaption } from "@/lib/profile";
 export const dynamic = "force-dynamic";
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
@@ -18,6 +18,19 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   ]);
   if (!profile) notFound();
   const self = viewer?.id === id;
+  const [blockedByMe, blockedMe, followingRow, followersCount, followingCount] = await Promise.all([
+    viewer && !self ? prisma.userBlock.findUnique({ where: { blockerId_blockedId: { blockerId: viewer.id, blockedId: id } }, select: { blockerId: true } }) : Promise.resolve(null),
+    viewer && !self ? prisma.userBlock.findUnique({ where: { blockerId_blockedId: { blockerId: id, blockedId: viewer.id } }, select: { blockerId: true } }) : Promise.resolve(null),
+    viewer && !self ? prisma.userFollow.findUnique({ where: { followerId_followingId: { followerId: viewer.id, followingId: id } }, select: { followerId: true } }) : Promise.resolve(null),
+    prisma.userFollow.count({ where: { followingId: id } }),
+    prisma.userFollow.count({ where: { followerId: id } }),
+  ]);
+  if (blockedMe) notFound();
+  if (blockedByMe) return <main className="profile-page">
+    <header className="feed-heading detail-header"><Link href="/" aria-label="Kembali"><ArrowLeft size={22}/></Link><div><h1>{profile.name}</h1><small>Akun diblokir</small></div></header>
+    <div className="blocked-profile-panel"><Ban size={28}/><h2>Anda memblokir akun ini</h2><p>Postingan dan pesan pribadi akun ini disembunyikan. Anda dapat membatalkan blokir kapan saja.</p>
+      {viewer && <FollowBlockControls userId={id} initiallyFollowing={false} initiallyBlocked initialFollowerCount={followersCount}/>}</div>
+  </main>;
   const where = { userId: id, ...((self || viewer?.role === "ADMIN") ? {} : { status: { not: "REJECTED" as const } }) };
   const [stats, posts] = await Promise.all([
     getProfileStats(id),
@@ -28,18 +41,19 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     <header className="feed-heading detail-header"><Link href="/" aria-label="Kembali"><ArrowLeft size={22}/></Link><div><h1>{profile.name}</h1><small>{stats.totalReports} laporan dikirim</small></div></header>
     <div className={`profile-banner banner-${profile.role.toLowerCase()}`}><span className="banner-pattern"/></div>
     <div className="profile-top"><UserAvatar user={profile} size="xl" link={false}/>
-      {self ? <div className="profile-own-actions"><Link className="secondary-action profile-edit-link" href="/settings/profile"><Settings2 size={16}/> Edit profil</Link><LogoutButton/></div> : viewer && profile.isActive ? <StartConversationButton userId={profile.id}/> : <span className="profile-visitor-badge"><ShieldCheck size={16}/> Profil komunitas</span>}
+      {self ? <div className="profile-own-actions"><Link className="secondary-action profile-edit-link" href="/settings/profile"><Settings2 size={16}/> Edit profil</Link><LogoutButton/></div> : viewer && profile.isActive ? <FollowBlockControls userId={profile.id} initiallyFollowing={Boolean(followingRow)} initiallyBlocked={false} initialFollowerCount={followersCount}/> : <span className="profile-visitor-badge"><ShieldCheck size={16}/> Profil komunitas</span>}
     </div>
     <div className="profile-info"><h2>{profile.name} {profile.role !== "PUBLIC" && <BadgeCheck size={21} className="verified-icon"/>}</h2>
       <p className="profile-handle">{profileHandle(profile)}</p>
       <div className="role-chip"><ShieldCheck size={14}/>{roleCaption(profile.role)}</div>
       {profile.bio && <p className="profile-bio">{profile.bio}</p>}
       <div className="profile-details">{profile.location && <span><MapPin size={16}/>{profile.location}</span>}<span><CalendarDays size={16}/>Bergabung {profile.createdAt.toLocaleDateString("id-ID", { month: "long", year: "numeric" })}</span></div>
+      <nav className="profile-follow-stats" aria-label="Relasi sosial"><Link href={`/users/${id}/followers`}><b>{followersCount.toLocaleString("id-ID")}</b> Pengikut</Link><Link href={`/users/${id}/following`}><b>{followingCount.toLocaleString("id-ID")}</b> Mengikuti</Link>{self && <Link href="/settings/blocked">Akun diblokir</Link>}</nav>
       {!profile.isActive && <p className="deactivated-label">Akun tidak aktif</p>}
     </div>
     <section className="profile-stats" aria-label="Statistik profil">
-      <div><Heart size={19} className="stat-like"/><strong>{stats.likesReceived.toLocaleString("id-ID")}</strong><span>Like diterima</span></div>
-      <div><ThumbsDown size={19} className="stat-dislike"/><strong>{stats.dislikesReceived.toLocaleString("id-ID")}</strong><span>Dislike diterima</span></div>
+      <div><ArrowBigUp size={19} className="stat-like"/><strong>{stats.likesReceived.toLocaleString("id-ID")}</strong><span>Up diterima</span></div>
+      <div><ArrowBigDown size={19} className="stat-dislike"/><strong>{stats.dislikesReceived.toLocaleString("id-ID")}</strong><span>Down diterima</span></div>
       <div><FileText size={19} className="stat-reports"/><strong>{stats.totalReports.toLocaleString("id-ID")}</strong><span>Laporan diunggah</span></div>
       <div><ShieldCheck size={19} className="stat-accuracy"/><strong>{stats.accuracy === null ? "—" : `${stats.accuracy}%`}</strong><span>Akurasi verifikasi</span></div>
     </section>

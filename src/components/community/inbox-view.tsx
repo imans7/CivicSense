@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, MessageCircle, MessageSquare, ShieldCheck } from "lucide-react";
 import { UserAvatar } from "@/components/community/user-avatar";
+import { requestInboxCountRefresh } from "@/components/community/inbox-count-provider";
 
 type InboxNotification = {
   id: string;
@@ -52,7 +53,7 @@ export function InboxView({
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") router.refresh();
     };
-    const timer = window.setInterval(refreshWhenVisible, 30000);
+    const timer = window.setInterval(refreshWhenVisible, 45000);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       window.clearInterval(timer);
@@ -68,7 +69,10 @@ export function InboxView({
     if (tab !== "Aktivitas" || !items.some((item) => !item.readAt)) return;
     fetch("/api/inbox/notifications/read", { method: "POST", credentials: "same-origin" })
       .then((response) => {
-        if (response.ok) setItems((current) => current.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })));
+        if (response.ok) {
+          setItems((current) => current.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })));
+          requestInboxCountRefresh();
+        }
       })
       .catch(() => undefined);
   }, [tab, items]);
@@ -76,6 +80,7 @@ export function InboxView({
   async function openNotification(item: InboxNotification) {
     if (!item.readAt) {
       await fetch(`/api/inbox/notifications/${item.id}/read`, { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+      requestInboxCountRefresh();
     }
     router.push(`/reports/${item.report.id}#diskusi`);
   }

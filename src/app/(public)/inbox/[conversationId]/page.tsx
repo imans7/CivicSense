@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { ChatView } from "@/components/community/chat-view";
+import { blockedBetween } from "@/lib/social";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,8 @@ export default async function ConversationPage({ params }: { params: Promise<{ c
   });
 
   if (!conversation) notFound();
+  const otherId=conversation.userOneId===user.id?conversation.userTwoId:conversation.userOneId;
+  if(await blockedBetween(user.id,otherId)) notFound();
   const otherUser = conversation.userOneId === user.id ? conversation.userTwo : conversation.userOne;
   const initialMessages = [...conversation.messages].reverse().map((message) => ({
     id: message.id,

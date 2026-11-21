@@ -29,7 +29,7 @@ export function ImageUploader({
   const [removing, setRemoving] = useState<string | null>(null);
 
   async function handleFiles(files: FileList | null) {
-    if (!files?.length) return;
+    if (!files?.length || busy) return;
 
     const room = maxFiles - value.length;
     if (room <= 0) {
@@ -40,36 +40,50 @@ export function ImageUploader({
       toast.warning(`Hanya ${room} foto lagi yang bisa ditambahkan`);
     }
 
+    const selected = Array.from(files).slice(0, room);
+    const uploaded: (UploadedImage | undefined)[] = new Array(selected.length);
+    let nextIndex = 0;
     setBusy(true);
-    let next = [...value];
 
-    for (const original of Array.from(files).slice(0, room)) {
-      try {
-        if (!(IMAGE_RULES.allowedMimeTypes as readonly string[]).includes(original.type)) {
-          throw new Error("Format harus JPG, PNG, atau WebP");
+    const worker = async () => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= selected.length) return;
+        const original = selected[index];
+
+        try {
+          if (!(IMAGE_RULES.allowedMimeTypes as readonly string[]).includes(original.type)) {
+            throw new Error("Format harus JPG, PNG, atau WebP");
+          }
+          const file = await compressImage(original);
+          if (file.size > IMAGE_RULES.maxSizeBytes) {
+            throw new Error("Ukuran foto melebihi 4MB");
+          }
+
+          const body = new FormData();
+          body.append("file", file);
+          body.append("type", type);
+
+          const res = await fetch("/api/upload", { method: "POST", body });
+          const json = await res.json().catch(() => null);
+          if (!res.ok) throw new Error(json?.error ?? "Gagal mengunggah foto");
+          uploaded[index] = json.data as UploadedImage;
+        } catch (error) {
+          toast.error(`${original.name}: ${error instanceof Error ? error.message : "Gagal"}`);
         }
-        const file = await compressImage(original);
-        if (file.size > IMAGE_RULES.maxSizeBytes) {
-          throw new Error("Ukuran foto melebihi 4MB");
-        }
-
-        const body = new FormData();
-        body.append("file", file);
-        body.append("type", type);
-
-        const res = await fetch("/api/upload", { method: "POST", body });
-        const json = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(json?.error ?? "Gagal mengunggah foto");
-
-        next = [...next, json.data as UploadedImage];
-        onChange(next);
-      } catch (e) {
-        toast.error(`${original.name}: ${e instanceof Error ? e.message : "Gagal"}`);
       }
-    }
+    };
 
-    setBusy(false);
-    if (inputRef.current) inputRef.current.value = "";
+    try {
+      // Dua unggahan paralel mempercepat pemilihan beberapa foto tanpa
+      // membanjiri koneksi browser atau layanan Cloudinary.
+      await Promise.all(Array.from({ length: Math.min(2, selected.length) }, () => worker()));
+      const successful = uploaded.filter((item): item is UploadedImage => Boolean(item));
+      if (successful.length) onChange([...value, ...successful]);
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
   }
 
   async function handleRemove(image: UploadedImage) {
@@ -110,7 +124,7 @@ export function ImageUploader({
             <button
               type="button"
               onClick={() => handleRemove(img)}
-              disabled={disabled || removing === img.publicId}
+              disabled={disabled || busy || removing === img.publicId}
               aria-label="Hapus foto"
               className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black disabled:opacity-50"
             >

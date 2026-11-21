@@ -8,11 +8,13 @@ import { PostCard } from "@/components/community/post-card";
 import { UserAvatar } from "@/components/community/user-avatar";
 import { CommentForm } from "@/components/community/comment-form";
 import { STATUS_LABELS } from "@/lib/constants";
+import { excludedUserIds } from "@/lib/social";
 export const dynamic="force-dynamic";
 export default async function Page({params}:{params:Promise<{id:string}>}){
  const user=await currentUser();const {id}=await params;
- const r=await prisma.report.findUnique({where:{id},include:{...feedInclude,histories:{include:{user:{select:{name:true}}},orderBy:{createdAt:"asc"}},comments:{include:{user:{select:{id:true,name:true,role:true,avatarUrl:true}}},orderBy:{createdAt:"asc"},take:100},assignedTo:{select:{name:true}}}});
- if(!r||(r.status==="REJECTED"&&user?.id!==r.userId&&user?.role!=="ADMIN"))notFound();
+ const excluded=user?.role==="ADMIN"?[]:await excludedUserIds(user?.id);
+ const r=await prisma.report.findUnique({where:{id},include:{...feedInclude,histories:{include:{user:{select:{name:true}}},orderBy:{createdAt:"asc"}},comments:{where:excluded.length?{userId:{notIn:excluded}}:{},include:{user:{select:{id:true,name:true,role:true,avatarUrl:true}}},orderBy:{createdAt:"asc"},take:100},assignedTo:{select:{name:true}}}});
+ if(!r||excluded.includes(r.userId)||(r.status==="REJECTED"&&user?.id!==r.userId&&user?.role!=="ADMIN"))notFound();
  const sets=await interactionSets(user?.id,[r.id]);
  return <main><header className="feed-heading detail-header"><Link href="/" aria-label="Kembali"><ArrowLeft size={22}/></Link><div><h1>Detail laporan</h1><small>{r.reportNumber}</small></div></header><PostCard post={r} loggedIn={Boolean(user)} initiallyLiked={sets.liked.has(r.id)} initiallyDisliked={sets.disliked.has(r.id)} initiallySaved={sets.saved.has(r.id)}/><div className="detail-context"><p><MapPin size={17}/> {r.address||"Lokasi tersimpan di sistem"}</p>{r.assignedTo&&<p>Petugas: {r.assignedTo.name}</p>}<p><Clock3 size={17}/> Diterbitkan {r.createdAt.toLocaleString("id-ID")}</p></div>
  <section id="diskusi" className="community-discussion"><h2><MessageCircle size={21}/> Diskusi warga <span>{r._count.comments}</span></h2>{user?<CommentForm reportId={r.id}/>:<p className="login-comment"><Link href="/login">Masuk</Link> untuk bergabung dalam diskusi.</p>}

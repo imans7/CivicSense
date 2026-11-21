@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, CheckCheck, Send, ShieldCheck } from "lucide-react";
 import { UserAvatar } from "@/components/community/user-avatar";
+import { requestInboxCountRefresh } from "@/components/community/inbox-count-provider";
 
 type ChatUser = { id: string; name: string; role: "PUBLIC" | "OFFICER" | "ADMIN"; avatarUrl: string | null };
 type ChatMessage = {
@@ -15,6 +16,7 @@ type ChatMessage = {
   sender: { id: string; name: string; avatarUrl: string | null };
 };
 type ReadReceipt = { id: string; readAt: string | null };
+type MessageCursor = { createdAt: string; id: string } | null;
 
 export function ChatView({
   conversationId,
@@ -31,28 +33,57 @@ export function ChatView({
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const latest = useRef<string | null>(initialMessages.at(-1)?.createdAt ?? null);
+  const messagesRef = useRef(messages);
+  const latest = useRef<MessageCursor>(
+    initialMessages.length
+      ? { createdAt: initialMessages[initialMessages.length - 1].createdAt, id: initialMessages[initialMessages.length - 1].id }
+      : null,
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
-    const markRead = () => fetch(`/api/inbox/conversations/${conversationId}/read`, {
-      method: "POST",
-      credentials: "same-origin",
-    }).catch(() => undefined);
+    let polling = false;
+    let controller: AbortController | null = null;
+
+    const markRead = async () => {
+      const response = await fetch(`/api/inbox/conversations/${conversationId}/read`, {
+        method: "POST",
+        credentials: "same-origin",
+      }).catch(() => null);
+      if (response?.ok) requestInboxCountRefresh();
+    };
 
     const poll = async () => {
-      if (document.visibilityState !== "visible") return;
+      if (!active || document.visibilityState !== "visible" || polling) return;
+      polling = true;
+      controller = new AbortController();
+
       try {
-        const suffix = latest.current ? `?after=${encodeURIComponent(latest.current)}` : "";
+        const params = new URLSearchParams();
+        if (latest.current) {
+          params.set("after", latest.current.createdAt);
+          params.set("afterId", latest.current.id);
+        }
+        const pendingReceiptIds = messagesRef.current
+          .filter((message) => message.senderId === currentUserId && !message.readAt)
+          .map((message) => message.id)
+          .slice(-100);
+        if (pendingReceiptIds.length) params.set("receiptIds", pendingReceiptIds.join(","));
+
+        const query = params.toString();
+        const suffix = query ? `?${query}` : "";
         const response = await fetch(`/api/inbox/conversations/${conversationId}/messages${suffix}`, {
           cache: "no-store",
           credentials: "same-origin",
+          signal: controller.signal,
         });
         if (!response.ok) return;
+
         const data = (await response.json()) as {
           messages?: ChatMessage[];
           readReceipts?: ReadReceipt[];
+          serverTime?: string;
         };
         if (!active) return;
 
@@ -64,8 +95,7 @@ export function ChatView({
             let changed = false;
 
             for (const message of incoming) {
-              const previous = byId.get(message.id);
-              if (!previous || previous.readAt !== message.readAt) {
+              if (!byId.has(message.id)) {
                 byId.set(message.id, message);
                 changed = true;
               }
@@ -77,34 +107,54 @@ export function ChatView({
                 changed = true;
               }
             }
+
             return changed
-              ? [...byId.values()].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+              ? [...byId.values()].sort((a, b) =>
+                  new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id.localeCompare(b.id),
+                )
               : current;
           });
         }
 
         const last = incoming[incoming.length - 1];
         if (last) {
-          latest.current = last.createdAt;
-          await markRead();
+          latest.current = { createdAt: last.createdAt, id: last.id };
+        } else if (!latest.current) {
+          // Setelah pemeriksaan awal kosong, gunakan waktu ini sebagai batas
+          // agar polling berikutnya tidak terus meminta riwayat percakapan penuh.
+          latest.current = { createdAt: data.serverTime || new Date().toISOString(), id: "" };
         }
-      } catch {
-        // Polling berikutnya mencoba kembali jika koneksi sementara terputus.
+        if (incoming.some((message) => message.senderId !== currentUserId)) await markRead();
+      } catch (cause) {
+        if (!(cause instanceof DOMException && cause.name === "AbortError")) {
+          // Polling berikutnya mencoba kembali jika koneksi sementara terputus.
+        }
+      } finally {
+        polling = false;
+        controller = null;
       }
     };
 
-    void markRead();
-    const timer = window.setInterval(poll, 6000);
+    const hasUnreadIncoming = initialMessages.some((message) => message.senderId !== currentUserId && !message.readAt);
+    if (hasUnreadIncoming) void markRead();
+
+    const timer = window.setInterval(() => void poll(), 10000);
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") void poll();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       active = false;
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      controller?.abort();
     };
-  }, [conversationId]);
+  }, [conversationId, currentUserId, initialMessages]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -127,7 +177,7 @@ export function ChatView({
       if (!response.ok || !data.message) throw new Error(data.error || "Pesan gagal dikirim");
       const sentMessage = data.message;
       setMessages((current) => current.some((item) => item.id === sentMessage.id) ? current : [...current, sentMessage]);
-      latest.current = sentMessage.createdAt;
+      latest.current = { createdAt: sentMessage.createdAt, id: sentMessage.id };
       setContent("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Terjadi kesalahan saat mengirim pesan");

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { currentUser } from "@/lib/session";
 import { originAllowed } from "@/lib/community-api";
 import { rateLimit } from "@/lib/rate-limit";
+import { blockedBetween } from "@/lib/social";
 
 const schema = z.object({ userId: z.string().min(1).max(64) });
 
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
     select: { id: true },
   });
   if (!target) return NextResponse.json({ error: "Akun tujuan tidak ditemukan atau tidak aktif" }, { status: 404 });
+  if (await blockedBetween(user.id,target.id)) return NextResponse.json({ error: "Tidak bisa memulai percakapan dengan akun ini" }, { status: 403 });
 
   const [userOneId, userTwoId] = [user.id, target.id].sort();
   const conversation = await prisma.conversation.upsert({
